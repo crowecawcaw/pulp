@@ -49,8 +49,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          # No npm cache here on purpose: this workflow publishes signed release
+          # artifacts, so a restored cache is a supply-chain (cache-poisoning)
+          # vector. Release builds are rare, so the cache miss is cheap.
 
       - name: Build frontend (populates backend/web-dist, embedded via rust-embed)
         run: cd frontend && npm ci && npm run build

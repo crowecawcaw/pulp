@@ -4,14 +4,16 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, closed]
 
-permissions:
-  contents: write
-  pull-requests: write
+# No workflow-wide permissions — each job requests only the scopes it needs.
+permissions: {}
 
 jobs:
   deploy-preview:
     if: github.event.action != 'closed'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # peaceiris pushes the built preview to the gh-pages branch
+      pull-requests: write # post/update the preview-link comment
     steps:
       - uses: actions/checkout@v4
 
@@ -26,7 +28,10 @@ jobs:
         working-directory: frontend
 
       - name: Build
-        run: npm run build -- --base=/${{ github.event.repository.name }}/pr-${{ github.event.pull_request.number }}/
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: npm run build -- --base=/"$REPO_NAME"/pr-"$PR_NUMBER"/
         working-directory: frontend
 
       - name: Deploy to gh-pages
@@ -70,6 +75,8 @@ jobs:
   cleanup-preview:
     if: github.event.action == 'closed'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # git rm the PR's preview dir from the gh-pages branch
     steps:
       - uses: actions/checkout@v4
         with:
