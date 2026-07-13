@@ -136,8 +136,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install zizmor
-        run: pipx install zizmor==1.26.1
-
       - name: Audit workflows (fail on any high-severity finding)
-        run: zizmor --min-severity high .github/workflows/
+        uses: zizmorcore/zizmor-action@v0.5.7
+        with:
+          inputs: .github/workflows/
+          config: .github/zizmor.yml
+          min-severity: high
+          # This repo has no GitHub Advanced Security, so don't try to upload
+          # SARIF to the security tab — print findings to the log and let a
+          # high-severity finding fail the job (the action propagates zizmor's
+          # exit code).
+          advanced-security: false
