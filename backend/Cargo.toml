@@ -1,0 +1,105 @@
+[package]
+name = "pulp"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+# Required by `dist` (cargo-dist) to wire up GitHub Releases in the generated
+# release workflow. See /dist-workspace.toml for the packaging config.
+repository = "https://github.com/crowecawcaw/pulp"
+homepage = "https://github.com/crowecawcaw/pulp"
+description = "Self-hostable social listening / brand monitoring for developer communities"
+# The published crate must carry the built web UI (web-dist/), which is
+# gitignored — so we set an explicit `include`. Once `include` is set it is the
+# ONLY allowlist Cargo packages, so it must enumerate everything the crate needs
+# (source, migrations, tests, build.rs, openapi.json, .env.example) PLUS
+# web-dist/. Keep this in sync with `cargo package --list`.
+include = [
+    "src/**/*",
+    "migrations/**/*",
+    "tests/**/*",
+    "build.rs",
+    "Cargo.toml",
+    "openapi.json",
+    ".env.example",
+    "web-dist/**/*",
+]
+
+[[bin]]
+name = "pulp"
+path = "src/main.rs"
+
+[lib]
+name = "pulp"
+path = "src/lib.rs"
+
+[dependencies]
+axum = { version = "0.7", features = ["macros"] }
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "migrate"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "blocking", "stream"], default-features = false }
+dotenvy = "0.15"
+home = "0.5"
+thiserror = "1"
+anyhow = "1"
+ulid = "1"
+clap = { version = "4", features = ["derive", "env", "wrap_help"] }
+async-trait = "0.1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+regex = "1"
+chrono = { version = "0.4", features = ["serde"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+futures = "0.3"
+utoipa = { version = "5", features = ["axum_extras", "chrono"] }
+sha2 = "0.10"
+# Single-binary frontend: embeds backend/web-dist in release builds (debug
+# builds read the directory live from disk, so `npm run build` needs no
+# recompile). web-dist is vendored into the published crate via `include` below.
+rust-embed = "8"
+mime_guess = "2"
+# HTTPS listener. `tls-rustls-no-provider` + an explicit ring provider keeps
+# aws-lc-rs (cmake+nasm at build time) out of the dependency tree; reqwest
+# already pulls ring via its rustls-tls feature.
+axum-server = { version = "0.7", features = ["tls-rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "logging", "tls12"] }
+# Web Push (RFC 8291 message encryption + RFC 8292 VAPID) is implemented with
+# pure-Rust RustCrypto crates so it adds no native build deps — deliberately
+# avoiding the `web-push` crate, which pulls in OpenSSL via `ece`. Pinned to the
+# digest-0.10 generation so they share `sha2 = 0.10` above.
+p256 = { version = "0.13", features = ["ecdh", "ecdsa", "pkcs8"] }
+hkdf = "0.12"
+aes-gcm = "0.10"
+base64 = "0.22"
+rand_core = { version = "0.6", features = ["getrandom"] }
+
+# --- Desktop tray launcher (`pulp app`) — OFF BY DEFAULT ------------------
+# All of these are optional and gated behind the `tray` feature (below). They
+# are deliberately kept out of the default build because on Linux `tray-icon`
+# pulls GTK3 + libayatana-appindicator (native build deps this project
+# otherwise avoids), and the CI/default build must stay dependency-free.
+# `muda` (the menu library) is re-exported by `tray-icon` as `tray_icon::menu`,
+# so it is not listed separately.
+tray-icon = { version = "0.24", optional = true }
+tao = { version = "0.35", optional = true }
+auto-launch = { version = "0.6", optional = true }
+# Only the PNG decoder is needed (to decode the embedded brand icon); drop the
+# rest of `image`'s codecs to stay lean.
+image = { version = "0.25", default-features = false, features = ["png"], optional = true }
+open = { version = "5", optional = true }
+
+[features]
+# Enable the system-tray/menubar desktop launcher (`pulp app`). Requires GTK3 +
+# libayatana-appindicator dev packages on Linux. Not part of the default build.
+tray = ["dep:tray-icon", "dep:tao", "dep:auto-launch", "dep:image", "dep:open"]
+
+[dev-dependencies]
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+# `test-util` is not part of tokio's `full` feature; it enables paused/virtual
+# time (`start_paused`, `tokio::time::advance`) used by the ratelimit tests.
+tokio = { version = "1", features = ["full", "test-util"] }
+serde_json = "1"
+serial_test = "3"
+uuid = { version = "1", features = ["v4"] }
+httpmock = "0.7"

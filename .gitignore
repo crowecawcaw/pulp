@@ -1,0 +1,38 @@
+# Rust
+backend/target/
+
+# Frontend
+frontend/node_modules/
+# Built web UI: vite emits it into the crate root (see frontend/vite.config.ts)
+# so rust-embed / cargo package can vendor it. It's a build artifact — ignored.
+backend/web-dist/
+
+# Python
+__pycache__/
+*.pyc
+
+# Data
+/data/
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+# Env
+.env
+*.env
+backend/.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Eval scratch
+eval/data/feed_cache/
+eval/__pycache__/
+eval/results_smoke/
+
+# Server logs
+backend/server.log
+backend/server.err.log
+backend/server.out.log

@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# GitHub-hosted Linux runners only, to conserve Actions minutes on the private
+# repo. macOS/Windows are deliberately not exercised here (the desktop app
+# workflows that need them are disabled until closer to release).
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check formatting
+        run: cargo fmt --check
+        working-directory: backend
+
+      - name: Build
+        run: cargo build
+        working-directory: backend
+
+      - name: Run tests
+        run: cargo test
+        working-directory: backend
+
+      # The desktop tray launcher (`pulp app`) lives behind the `tray` feature,
+      # which links GTK3 + libayatana-appindicator + libxdo on Linux. Exercise
+      # that build too so the feature can't rot — it isn't covered by the
+      # default build above.
+      - name: Install tray build deps (GTK / appindicator / xdo)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libayatana-appindicator3-dev libxdo-dev
+
+      - name: Build (tray feature)
+        run: cargo build --features tray
+        working-directory: backend
+
+      - name: Check for unused dependencies
+        run: |
+          cargo install cargo-machete --locked
+          cargo machete
+        working-directory: backend
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Lint
+        run: npm run lint
+        working-directory: frontend
+
+      - name: Run tests
+        run: npm test
+        working-directory: frontend
+
+      - name: Build
+        run: npm run build
+        working-directory: frontend
+
+      # Advisory: reports unused files/exports/deps. Not a hard gate because
+      # knip has known false positives here (the service worker and the icon
+      # script are wired indirectly, not via imports).
+      - name: Dead-code report (advisory)
+        run: npx --yes knip
+        working-directory: frontend
+        continue-on-error: true
+
+  api-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Regenerate OpenAPI spec
+        run: cargo run -- --dump-openapi > openapi.json
+        working-directory: backend
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Regenerate TypeScript types from OpenAPI spec
+        run: npm run gen:api:file
+        working-directory: frontend
+
+      - name: Check for API drift
+        run: git diff --exit-code backend/openapi.json frontend/src/api/types.gen.ts

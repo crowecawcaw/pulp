@@ -1,0 +1,24 @@
+# Custom build-setup steps injected by `dist` before every `dist build`.
+#
+# Referenced from the release config via `github-build-setup =
+# "build-setup.yml"` (the path is resolved relative to `.github/workflows`).
+# `dist` splices these steps into each per-target build job, right before it
+# invokes the cargo build.
+#
+# WHY THIS EXISTS: the `pulp` binary embeds the compiled web UI at compile time
+# — `backend/src/web.rs` uses `rust-embed` with `#[folder = "web-dist"]`.
+# `backend/web-dist` is gitignored and absent from a fresh checkout, so the
+# frontend MUST be built here BEFORE cargo compiles the backend. If it is
+# missing the binary still links but serves an empty-UI placeholder — a broken
+# release. These steps run on every build runner (Linux, macOS, Windows).
+- name: Set up Node.js (to build the embedded web UI)
+  uses: actions/setup-node@v4
+  with:
+    node-version: '20'
+    cache: npm
+    cache-dependency-path: frontend/package-lock.json
+
+# NOTE: `dist` does not preserve a step-level `working-directory:` when it
+# splices these steps in, so `cd frontend` is inlined into the run script.
+- name: Build frontend (populates backend/web-dist, embedded via rust-embed)
+  run: cd frontend && npm ci && npm run build

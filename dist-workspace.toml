@@ -1,0 +1,54 @@
+# Release packaging config for `dist` (cargo-dist).
+#
+# WHY THIS FILE EXISTS AT THE REPO ROOT: `backend/` is a standalone crate with
+# no Cargo workspace (there is no root Cargo.toml). `dist` needs a workspace
+# root, so we declare one here that points at the single cargo package. This
+# keeps `dist` config out of `backend/Cargo.toml` and lets it see the sibling
+# `frontend/` dir it must build first (see `github-build-setup` below).
+[workspace]
+members = ["cargo:backend"]
+
+[dist]
+# The cargo-dist CLI version this config was generated/verified against.
+cargo-dist-version = "0.32.0"
+# Generate GitHub Actions release CI (.github/workflows/release.yml).
+ci = "github"
+# Release the `tray` feature so the downloadable desktop binaries include the
+# `pulp app` system-tray launcher. On Linux this pulls GTK3 + appindicator,
+# whose dev packages are installed on the Linux runner via [dist.dependencies.apt].
+features = ["tray"]
+# Install methods:
+#   shell       → curl | sh one-liner (agent / CLI path)
+# NOTE: Linux-only for now to conserve Actions minutes on the private repo. The
+# macOS/Windows targets and the `powershell` installer are commented out (they
+# spin the expensive macOS/Windows GitHub-hosted runners on every tagged
+# release). Re-add them — plus the disabled release-macos-app / release-windows-app
+# workflows — when closer to a public release.
+installers = ["shell"]
+# Build targets. Linux x86_64 only for now (see the note above).
+# aarch64-unknown-linux-gnu is also OMITTED: the `tray` feature needs
+# GTK3/appindicator native libs, and cross-compiling those to arm64 on an x86
+# runner requires arm64 multiarch apt packages that dist's zig-based linux
+# cross-build does not wire up — it would break the build.
+targets = [
+    # "aarch64-apple-darwin",
+    # "x86_64-apple-darwin",
+    # "x86_64-pc-windows-msvc",
+    "x86_64-unknown-linux-gnu",
+]
+# Path (relative to .github/workflows) to a YAML array of steps dist splices
+# into every per-target build job BEFORE `dist build`. Ours builds the frontend
+# so it can be embedded into the binary via rust-embed. See build-setup/build-setup.yml.
+github-build-setup = "build-setup/build-setup.yml"
+# Compressed-archive formats for the downloadable artifacts.
+unix-archive = ".tar.xz"
+windows-archive = ".zip"
+
+# Linux-only system dependencies for the `tray` feature (GTK3 tray icon,
+# libayatana-appindicator menu-bar item, libxdo input). Installed via apt on the
+# x86_64-unknown-linux-gnu runner before the cargo build. macOS/Windows need no
+# extra system deps for the tray, so this section is Linux-scoped by nature.
+[dist.dependencies.apt]
+libgtk-3-dev = '*'
+libayatana-appindicator3-dev = '*'
+libxdo-dev = '*'

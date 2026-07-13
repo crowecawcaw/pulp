@@ -1,0 +1,224 @@
+name: Release macOS app
+
+# Builds a signed + notarized macOS desktop app (Pulp.app) and ships it as a
+# .dmg attached to the GitHub Release for the tag.
+#
+# This is SEPARATE from cargo-dist's release.yml (which produces the CLI/agent
+# install path: plain .tar.xz archives + install scripts). Here we produce the
+# double-click experience: a universal Pulp.app whose launcher runs `pulp app`
+# (the tray/menu-bar launcher), packaged into a signed, notarized, stapled .dmg.
+#
+# Signing/notarization runs only when the Apple secrets are present (see the
+# `preflight` step). Without them the job still builds an UNSIGNED .dmg so tag
+# pushes succeed before certs are configured — Gatekeeper will warn on that one.
+#
+# Required secrets (all documented in RELEASING.md):
+#   MACOS_CERTIFICATE           base64 of the "Developer ID Application" .p12
+#   MACOS_CERTIFICATE_PASSWORD  password for that .p12
+#   MACOS_SIGN_IDENTITY         "Developer ID Application: NAME (TEAMID)" string
+#   KEYCHAIN_PASSWORD           ephemeral password for the temporary keychain
+#   APPLE_ID                    Apple ID email used for notarization
+#   APPLE_NOTARY_PASSWORD       app-specific password for that Apple ID
+#   APPLE_TEAM_ID               10-char Apple Developer Team ID
+
+# DISABLED for now to conserve Actions minutes on the private repo — macOS
+# runners are billed at 10x. This builds only via manual dispatch. To re-enable
+# automatic signed .dmg builds on release, restore the `push: tags` trigger.
+on:
+  workflow_dispatch:
+  # push:
+  #   tags:
+  #     - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  macos-app:
+    # Apple silicon runner; we still build BOTH arches and lipo them universal.
+    runs-on: macos-14
+    env:
+      # Reverse-DNS bundle id. Maintainers should set an identifier they own.
+      PULP_BUNDLE_ID: com.nimbuslabs.pulp
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- Frontend first: the web UI is embedded into the binary at compile
+      #     time via rust-embed from backend/web-dist (built by Vite). ---
+      - name: Set up Node.js (to build the embedded web UI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend (populates backend/web-dist, embedded via rust-embed)
+        run: cd frontend && npm ci && npm run build
+
+      - name: Install Rust toolchain (both macOS arches)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      # --- Build the tray-enabled binary for both arches. The desktop app MUST
+      #     be built with --features tray (the `pulp app` launcher). macOS needs
+      #     no extra system libs for the tray. ---
+      - name: Build pulp (aarch64, --features tray)
+        run: cd backend && cargo build --release --features tray --target aarch64-apple-darwin
+
+      - name: Build pulp (x86_64, --features tray)
+        run: cd backend && cargo build --release --features tray --target x86_64-apple-darwin
+
+      - name: Derive version from tag
+        id: version
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            # workflow_dispatch: fall back to the crate version.
+            VERSION="$(grep -m1 '^version' backend/Cargo.toml | cut -d'"' -f2)"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building Pulp version $VERSION"
+
+      - name: Create universal binary (lipo)
+        run: |
+          set -euo pipefail
+          lipo -create \
+            backend/target/aarch64-apple-darwin/release/pulp \
+            backend/target/x86_64-apple-darwin/release/pulp \
+            -output "$RUNNER_TEMP/pulp-universal"
+          lipo -info "$RUNNER_TEMP/pulp-universal"
+
+      - name: Generate .icns from the brand PNG
+        run: |
+          set -euo pipefail
+          bash scripts/macos/make-icns.sh \
+            frontend/public/pwa-512x512.png \
+            "$RUNNER_TEMP/pulp.icns"
+
+      - name: Assemble Pulp.app
+        run: |
+          set -euo pipefail
+          bash scripts/macos/make-app.sh \
+            "$RUNNER_TEMP/pulp-universal" \
+            "$RUNNER_TEMP/pulp.icns" \
+            "${{ steps.version.outputs.version }}" \
+            "$RUNNER_TEMP/Pulp.app"
+
+      # --- Signing preflight: only sign/notarize if the certificate secret is
+      #     present. Secrets are unavailable in job-level `if:`, so we compute a
+      #     boolean output here and gate later steps on it. ---
+      - name: Signing preflight
+        id: preflight
+        env:
+          CERT: ${{ secrets.MACOS_CERTIFICATE }}
+        run: |
+          if [ -n "${CERT:-}" ]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::MACOS_CERTIFICATE not set — producing an UNSIGNED, un-notarized .dmg (Gatekeeper will warn)."
+          fi
+
+      # --- Import the Developer ID Application cert into a throwaway keychain.
+      #     Community-standard pattern (create → unlock → import → partition). ---
+      - name: Import signing certificate
+        if: steps.preflight.outputs.sign == 'true'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+          KEYCHAIN="$RUNNER_TEMP/app-signing.keychain-db"
+
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+
+          # Fresh, unlocked, auto-relocking keychain, added to the search list.
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          # Import the cert+key; -T allows codesign to use the key non-interactively.
+          security import "$CERT_PATH" \
+            -P "$MACOS_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN" -T /usr/bin/codesign
+          # Grant codesign access without a UI prompt.
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          # Put our keychain first in the search list (keep login for defaults).
+          security list-keychain -d user -s "$KEYCHAIN" login.keychain-db
+
+          rm -f "$CERT_PATH"
+
+      - name: Codesign the app (hardened runtime, timestamped)
+        if: steps.preflight.outputs.sign == 'true'
+        env:
+          IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/Pulp.app"
+          # Sign the inner Mach-O binaries first, then the bundle. --options
+          # runtime enables the hardened runtime (required for notarization).
+          codesign --force --options runtime --timestamp \
+            --sign "$IDENTITY" "$APP/Contents/MacOS/pulp"
+          codesign --force --deep --options runtime --timestamp \
+            --sign "$IDENTITY" "$APP"
+          codesign --verify --strict --verbose=2 "$APP"
+
+      - name: Notarize the app
+        if: steps.preflight.outputs.sign == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/Pulp.app"
+          ZIP="$RUNNER_TEMP/Pulp-notarize.zip"
+          # notarytool wants an archive; ditto preserves the bundle + signature.
+          /usr/bin/ditto -c -k --keepParent "$APP" "$ZIP"
+          xcrun notarytool submit "$ZIP" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_NOTARY_PASSWORD" \
+            --wait
+          # Staple the ticket onto the .app so it validates offline.
+          xcrun stapler staple "$APP"
+
+      - name: Build the .dmg
+        id: dmg
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG="$RUNNER_TEMP/Pulp-${VERSION}-universal.dmg"
+          bash scripts/macos/make-dmg.sh "$RUNNER_TEMP/Pulp.app" "$DMG"
+          echo "path=$DMG" >> "$GITHUB_OUTPUT"
+
+      - name: Codesign + notarize + staple the .dmg
+        if: steps.preflight.outputs.sign == 'true'
+        env:
+          IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          DMG="${{ steps.dmg.outputs.path }}"
+          codesign --force --timestamp --sign "$IDENTITY" "$DMG"
+          xcrun notarytool submit "$DMG" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_NOTARY_PASSWORD" \
+            --wait
+          xcrun stapler staple "$DMG"
+
+      - name: Upload .dmg to the GitHub Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.dmg.outputs.path }}
+          fail_on_unmatched_files: true

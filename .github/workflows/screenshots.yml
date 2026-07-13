@@ -1,0 +1,113 @@
+# .github/workflows/screenshots.yml
+#
+# Regenerate the framed demo screenshot in docs/screenshots/ and commit it back
+# to main. Runs the app in backend-free DEMO mode (?demo), captures a desktop +
+# mobile shot, frames each (browser chrome / phone body), and composites both
+# into one side-by-side PNG.
+#
+# Repo layout this workflow expects:
+#   .github/screenshots/capture.mjs     the Playwright capture+frame script
+#   .github/screenshots/package.json    pins the `playwright` package
+#   frontend/                           the Vite app (built to backend/web-dist)
+#   docs/screenshots/demo.png           the committed output
+#
+# ── Infinite-loop guard (this job pushes to main, which could retrigger it) ───
+# Four independent guards, any one of which is sufficient:
+#   1. push.paths-ignore excludes docs/screenshots/** and README.md, so a commit
+#      that only changes those paths does not match the trigger.
+#   2. GitHub does NOT start new workflow runs for pushes made with the default
+#      GITHUB_TOKEN (recursive-trigger protection) — the primary guard on
+#      github.com.
+#   3. The commit step is a no-op unless the PNGs actually changed
+#      (`git diff --quiet`), so identical renders never push.
+#   4. The commit message carries [skip ci], and the job is skipped when the
+#      actor is the bot — belt-and-suspenders for self-hosted/act runners where
+#      guard #2 may not apply.
+
+name: screenshots
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/screenshots/**'
+      - 'README.md'
+  workflow_dispatch: {}
+
+# Needed so the default GITHUB_TOKEN can push the regenerated images.
+permissions:
+  contents: write
+
+concurrency:
+  group: screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    # GitHub-hosted Linux runner (Actions-minute frugal).
+    runs-on: ubuntu-latest
+    # Guard #4: never run for a commit the bot itself made.
+    if: github.actor != 'github-actions[bot]'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # ── Build the web app ──────────────────────────────────────────────────
+      # A NORMAL production build is enough: demo mode is a RUNTIME toggle
+      # (?demo), so we do not build the VITE_DEMO variant and we do not ship a
+      # demo bundle. Output goes to the gitignored backend/web-dist.
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      # ── Install Playwright + Chromium ──────────────────────────────────────
+      # capture.mjs does `import { chromium } from 'playwright'`, so playwright
+      # must resolve from .github/screenshots/node_modules. Then fetch the
+      # browser + its system deps (fonts, libs) into the container.
+      - name: Install Playwright
+        working-directory: .github/screenshots
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+
+      # ── Serve the built app (static, no backend) ───────────────────────────
+      # `serve -s` gives SPA fallback so /feed?demo resolves to index.html.
+      - name: Serve built app
+        run: |
+          npx --yes serve -s backend/web-dist -l 5177 &
+          # Wait until it answers before capturing.
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://localhost:5177/ && break
+            sleep 1
+          done
+
+      # ── Capture + frame + composite ─────────────────────────────────────────
+      - name: Capture screenshot
+        working-directory: .github/screenshots
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/docs/screenshots"
+          node capture.mjs \
+            --base-url http://localhost:5177 \
+            --out "$GITHUB_WORKSPACE/docs/screenshots"
+
+      # ── Commit back only if the image changed ───────────────────────────────
+      - name: Commit updated screenshot
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots/demo.png
+          # Guard #3: skip the commit/push entirely when nothing changed.
+          if git diff --cached --quiet; then
+            echo "No screenshot changes — nothing to commit."
+            exit 0
+          fi
+          git commit -m "chore(docs): regenerate demo screenshot [skip ci]"
+          git push origin HEAD:main

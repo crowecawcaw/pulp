@@ -1,0 +1,1252 @@
+/* ═══════════════════════════════════════════════════════════════════
+   theme.css — single source of truth for all visual tokens & classes
+
+   To retheme: edit ONLY the 2 base vars at the top of :root.
+   Everything else derives from them automatically.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── base colors: change these to retheme the whole UI ────────── */
+  --c-accent:  #FF6F61;   /* citrus coral — primary action / highlight */
+  --c-accent2: #FF8A3D;   /* grapefruit orange — secondary highlight */
+  --c-ink:     #3A2410;   /* text, borders, dark surfaces (warm cocoa brown) */
+
+  /* ── display typeface (rounded, friendly) for titles & brand ─── */
+  --font-display: 'Baloo 2', 'Nunito', system-ui, sans-serif;
+
+  /* ── "die-cut sticker" surface treatment — white halo + soft drop
+        shadow, no border. Used by cards, the bottom nav, sticker pills. */
+  --halo:          0 0 0 5px #fff;
+  --halo-sm:       0 0 0 3px #fff;
+  --shadow-cut:    0 0 0 5px #fff, 0 16px 28px -10px rgba(90,55,20,.42);
+  --shadow-cut-sm: 0 0 0 3px #fff, 0 6px 10px -3px rgba(90,55,20,.34);
+  --shadow-float:  0 0 0 4px #fff, 0 8px 14px -5px rgba(120,70,25,.40);
+
+  /* active-nav citrus gradient (orange → coral → pink) */
+  --grad-active: linear-gradient(135deg, #FF9A3D, #FF6F61 55%, #FF7AA2);
+
+  /* ── derived palette — do not edit directly ───────────────────── */
+  --accent:    var(--c-accent);
+  --accent2:   var(--c-accent2);
+  --accent2-d: color-mix(in srgb, var(--c-accent2) 70%, black);
+  --accent-d:  color-mix(in srgb, var(--c-accent) 55%, black);
+  --accent-l:  color-mix(in srgb, var(--c-accent) 22%, white);
+  --accent-t:  color-mix(in srgb, var(--c-accent)  9%, white);
+  --ink:       var(--c-ink);
+  --mid:       color-mix(in srgb, var(--c-ink) 52%, white);
+  --faint:     color-mix(in srgb, var(--c-ink) 32%, white);
+  --border:    color-mix(in srgb, var(--c-ink) 15%, white);
+  --bg:        color-mix(in srgb, var(--c-ink) 4.5%, white);  /* app canvas behind white surfaces */
+
+  /* ── geometry tokens ──────────────────────────────────────────── */
+  --r-card:      1.125rem;   /* 18px — die-cut sticker corner */
+  --r-pill:      999px;
+  --r-input:     0.625rem;
+  --shadow-hard: var(--shadow-cut-sm);
+  --shadow-sm:   0 2px 6px -2px rgba(90,55,20,0.22);
+
+  /* vertical gap between stacked cards (feed, monitors, channels) — keep these
+     in sync by deriving every list spacing from this one token. */
+  --gap-cards:   1.375rem;
+}
+
+/* ═══ APP LAYOUT ══════════════════════════════════════════════════ */
+
+/* Calm citrus "blob" backdrop: color tucked into the corners, near-white in
+   the middle so card text stays readable. Fixed so it doesn't scroll. */
+.app-layout  {
+  display: flex; height: 100dvh; overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  background:
+    radial-gradient(680px 460px at -4% -6%,  #FFB07A55, transparent 60%),
+    radial-gradient(640px 440px at 104% 2%,  #FF8FB055, transparent 58%),
+    radial-gradient(680px 480px at 104% 104%, #B7E06A4d, transparent 60%),
+    radial-gradient(620px 460px at -6% 104%, #FFC85A4d, transparent 60%),
+    #FBF4EC;
+  background-attachment: fixed;
+}
+/* position:relative anchors the mobile top bar / bottom nav, which float as
+   absolute overlays so the feed scrolls *underneath* them (visible through
+   their blur) rather than being boxed between them. */
+.app-col     { display: flex; flex-direction: column; flex: 1; overflow: hidden; position: relative; }
+/* Sole scroller. overscroll-behavior:contain keeps the rubber-band/pull-to-
+   refresh inside the feed so it can't drag the page chrome (top/bottom nav).
+   The top/bottom padding reserves room for the floating bars so the first and
+   last cards aren't hidden behind them at the scroll extremes. */
+.app-content { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding-top: 3.5rem; padding-bottom: 6rem; }
+@media (min-width: 1024px) { .app-content { padding-top: 0; padding-bottom: 0; } }
+
+.center-fill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 1rem;
+  padding: 1.5rem;
+}
+
+/* ═══ SIDEBAR ═════════════════════════════════════════════════════ */
+
+/* .sidebar is shown via 'hidden lg:flex' Tailwind breakpoint classes;
+   we only style it here, not control display */
+.sidebar {
+  flex-direction: column;
+  width: 15rem;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-right: 1px solid rgba(255,255,255,0.6);
+  box-shadow: 1px 0 14px rgba(90,55,20,0.06);
+}
+.sidebar__logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar__logo-icon { color: var(--c-accent); }
+.sidebar__logo-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.375rem;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.sidebar__ws { padding: 0.75rem; border-bottom: 1px solid var(--border); }
+.sidebar__nav {
+  flex: 1;
+  padding: 1rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow-y: auto;
+}
+
+/* ═══ WORKSPACE PICKER ════════════════════════════════════════════ */
+
+.ws-picker-wrap { position: relative; }
+.ws-picker {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  /* same white "die-cut" sticker as the feed filter button & outline buttons */
+  border-radius: var(--r-input);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: #fff;
+  border: none;
+  cursor: pointer;
+  box-shadow: var(--shadow-float);
+  transition: box-shadow 0.15s;
+  font-family: inherit;
+}
+.ws-picker:hover { box-shadow: 0 0 0 4px #fff, 0 10px 16px -5px rgba(120,70,25,0.5); }
+.ws-picker__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-picker__caret { flex-shrink: 0; opacity: 0.5; }
+.ws-picker__dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0.25rem);
+  z-index: 50;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+}
+.ws-picker__opt {
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: var(--ink);
+  font-family: inherit;
+  transition: background 0.15s;
+  display: block;
+}
+.ws-picker__opt:hover { background: var(--accent-t); }
+.ws-picker__opt--active { color: var(--c-accent); }
+.ws-picker__divider { border-top: 1px solid var(--border); }
+.ws-picker__new {
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--c-accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.ws-picker__new:hover { background: var(--accent-t); }
+
+/* Mobile top-bar variant: anchored to the right, tap-outside backdrop */
+.ws-picker__backdrop { position: fixed; inset: 0; z-index: 40; }
+.ws-picker__dropdown--topbar {
+  left: auto;
+  right: 0;
+  min-width: 12rem;
+  max-width: 85vw;
+}
+
+/* ═══ NAV ITEMS ═══════════════════════════════════════════════════ */
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--mid);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: background 0.15s, color 0.15s;
+}
+.nav-item:hover  { background: var(--accent-t); color: var(--ink); }
+.nav-item--active {
+  background: var(--grad-active);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 6px 12px -3px rgba(255,90,60,0.40);
+}
+.nav-item--active:hover { background: var(--grad-active); color: #fff; }
+
+/* ═══ MOBILE TOP BAR ══════════════════════════════════════════════ */
+
+.topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 3.5rem;
+  padding: 0 1rem;
+  /* Translucent + blurred so feed cards dissolve under it as they scroll past,
+     with a soft drop shadow keeping the bar legible against busy content. */
+  background: rgba(255,255,255,0.62);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border-bottom: 1px solid rgba(255,255,255,0.5);
+  box-shadow: 0 6px 18px -12px rgba(90,55,20,0.55);
+  z-index: 20;
+}
+.topbar__brand { display: flex; align-items: center; gap: 0.5rem; }
+.topbar__icon  { color: var(--c-accent); }
+.topbar__name  { font-family: var(--font-display); font-weight: 800; font-size: 1.25rem; letter-spacing: -0.02em; color: var(--ink); }
+.topbar__menu {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--mid);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s;
+}
+.topbar__menu:hover { color: var(--ink); }
+.topbar__ws-name { max-width: 8.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar__ws { position: relative; }
+
+/* ═══ MOBILE BOTTOM NAV ═══════════════════════════════════════════ */
+
+.bottom-nav {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  /* env() respects the iOS home-indicator inset on installed PWAs */
+  padding: 0.5rem 0.75rem calc(0.75rem + env(safe-area-inset-bottom));
+  background: transparent;
+  user-select: none;
+  z-index: 20;
+  /* The wrapper is just a gutter — let scroll/touch pass through to the feed;
+     only the pill itself is interactive. */
+  pointer-events: none;
+}
+/* Soft fade beneath the nav so feed content dissolves into the canvas instead
+   of butting hard against the floating pill as it scrolls past underneath. */
+.bottom-nav::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to top, var(--bg) 22%, transparent);
+}
+.bottom-nav__inner {
+  position: relative;
+  display: flex;
+  gap: 0.375rem;
+  background: #fff;
+  padding: 0.375rem;
+  border-radius: 1.25rem;
+  /* A white halo vanishes against the white feed cards, so the floating pill
+     gets a hairline edge + a stronger all-around drop shadow (the ambient
+     0 2px… layer lifts it off the card directly above, the deep layer anchors
+     it to the screen). */
+  border: 1px solid color-mix(in srgb, var(--c-ink) 9%, transparent);
+  box-shadow:
+    0 2px 10px rgba(90, 55, 20, 0.10),
+    0 14px 30px -8px rgba(90, 55, 20, 0.50);
+  pointer-events: auto;
+}
+.bottom-nav__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  padding: 0.5rem 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 0.75rem;
+  color: var(--mid);
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+.bottom-nav__item--active {
+  background: var(--grad-active);
+  color: #fff;
+  box-shadow: var(--halo-sm), 0 6px 12px -2px rgba(255,90,60,0.5);
+}
+.bottom-nav__item:hover { color: var(--ink); }
+.bottom-nav__item--active:hover { color: #fff; }
+
+/* ═══ PAGE SHELL ══════════════════════════════════════════════════ */
+
+.page-narrow { padding: 1rem; max-width: 48rem; margin: 0 auto; }
+.page-mid    { padding: 1rem; max-width: 56rem; margin: 0 auto; }
+.page-wide   { padding: 1rem; max-width: 64rem; margin: 0 auto; }
+@media (min-width: 640px) {
+  .page-narrow, .page-mid, .page-wide { padding: 1.5rem; }
+}
+.page-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+.page-title {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+/* backward compat */
+.sq-page-title { font-family: var(--font-display); font-size: 2rem; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; line-height: 1.1; }
+.page-subtitle { font-size: 0.875rem; font-weight: 600; color: var(--mid); margin-bottom: 1.5rem; }
+.page-empty    { padding: 1.5rem; font-weight: 700; color: var(--mid); }
+.empty-state   { text-align: center; font-weight: 700; color: var(--mid); padding: 3rem 0; }
+.link-inline   { background: none; border: none; padding: 0; font: inherit; font-weight: 700; color: var(--c-accent); cursor: pointer; text-decoration: underline; }
+.link-inline:hover { color: var(--accent-d); }
+.loading-text  { font-weight: 700; color: var(--mid); }
+
+/* ═══ CARD ════════════════════════════════════════════════════════ */
+
+.card {
+  background: #fff;
+  border-radius: var(--r-card);
+  border: none;
+  box-shadow: var(--shadow-cut);
+  transition: box-shadow 0.14s, transform 0.14s;
+}
+/* Hover lift only for true mouse pointers — deepen the drop shadow under the
+   sticker (the white halo stays put) so rows don't wiggle on touch. */
+@media (hover: hover) {
+  .card:hover { box-shadow: 0 0 0 5px #fff, 0 20px 34px -10px rgba(90,55,20,0.5); }
+}
+.card--padded { padding: 1rem; }
+.card--read   { opacity: 0.68; }
+.card__hd {
+  padding: 1rem 1.25rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.card__hd-row { display: flex; align-items: center; justify-content: space-between; }
+.card__title  { font-size: 1rem; font-weight: 700; color: var(--ink); }
+.card__meta   { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.card__body   { padding: 0 1.25rem 1.25rem; }
+
+/* backward compat */
+.sq-card { background: #fff; border-radius: var(--r-card); border: none; box-shadow: var(--shadow-cut); transition: box-shadow 0.14s, transform 0.14s; }
+@media (hover: hover) {
+  .sq-card:hover { box-shadow: 0 0 0 5px #fff, 0 20px 34px -10px rgba(90,55,20,0.5); }
+}
+.sq-card--read { opacity: 0.68; }
+
+/* ═══ BUTTON ══════════════════════════════════════════════════════ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  border-radius: var(--r-pill);
+  padding: 0.5rem 1.125rem;
+  border: none;
+  /* Flat solid fill (no gradient) so primary buttons read as calm, consistent
+     actions — the citrus gradient is reserved for nav/active state. */
+  background: var(--c-accent);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: filter 0.1s, transform 0.1s, box-shadow 0.1s;
+  outline: none;
+}
+.btn:hover:not(:disabled) { filter: brightness(1.08); }
+.btn:active:not(:disabled) { transform: scale(0.98); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+.btn:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+
+.btn--sm { padding: 0.25rem 0.625rem; font-size: 0.75rem; }
+
+.btn--outline {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: var(--shadow-float);
+}
+.btn--outline:hover:not(:disabled) { filter: none; background: #fff; box-shadow: 0 0 0 4px #fff, 0 10px 16px -5px rgba(120,70,25,0.5); }
+.btn--outline:active:not(:disabled) { transform: scale(0.98); }
+
+.btn--ghost {
+  background: transparent;
+  color: var(--mid);
+  border-color: transparent;
+}
+.btn--ghost:hover:not(:disabled) { filter: none; background: var(--accent-t); color: var(--ink); }
+.btn--ghost:active:not(:disabled) { transform: none; }
+
+.btn--destructive {
+  background: hsl(0 69% 50%);
+  border-color: hsl(0 69% 35%);
+  color: #fff;
+}
+
+/* Ghost delete: muted by default so it doesn't outweigh the primary action
+   (no prominence inversion); turns red only on hover to confirm intent. */
+.btn--del.btn--ghost { color: var(--faint); }
+.btn--del.btn--ghost:hover:not(:disabled) { background: #FFD7CF; color: hsl(8 70% 42%); }
+
+/* ═══ BADGE ═══════════════════════════════════════════════════════ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--r-pill);
+  padding: 2px 10px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  border: 1.5px solid transparent;
+  white-space: nowrap;
+}
+.badge--default     { background: var(--c-accent);  color: #fff;            box-shadow: var(--halo-sm), 0 4px 7px rgba(150,45,35,.3); }
+.badge--secondary   { background: #fff;             color: #7a5a40;         border-color: #ece1d2; }
+/* AI ✓ / positive — green "die-cut" sticker */
+.badge--success     { background: #BDF07A;          color: #1C6B32;         box-shadow: var(--halo-sm), 0 4px 7px rgba(40,110,40,.3); }
+.badge--warning     { background: #FFE7B0;          color: #9A5B00;         border-color: #F4C879; }
+.badge--destructive { background: #FFD7CF;          color: hsl(8 70% 42%);  border-color: #FFB7A8; }
+.badge--muted       { background: var(--bg);        color: var(--faint);    border-color: var(--border); }
+.badge--outline     { background: transparent;      color: var(--ink);      border-color: var(--ink); }
+
+/* term-pill: a monitor's keyword shown as a high-contrast black/white pill.
+   Clickable — opens the monitor's edit dialog. Deliberately uncolored. */
+.term-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  background: none;
+  color: var(--ink);
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.12s;
+}
+.term-pill:not(:last-child)::after { content: ','; color: var(--faint); }
+.term-pill:hover { color: var(--c-accent); text-decoration: underline; }
+
+/* term-chips: tags input for a monitor's match-any keyword list */
+.term-chips { display: flex; flex-direction: column; gap: 0.5rem; }
+.term-chip { gap: 0.25rem; padding-right: 4px; }
+.term-chip__remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: transparent; color: inherit;
+  cursor: pointer; padding: 0; opacity: 0.7;
+}
+.term-chip__remove:hover { opacity: 1; }
+
+/* ═══ FORM ════════════════════════════════════════════════════════ */
+
+.field-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink);
+  text-transform: lowercase;
+  line-height: 1;
+}
+.field-group   { display: flex; flex-direction: column; gap: 0.5rem; }
+.field-hint    { font-size: 0.75rem; font-weight: 600; color: var(--faint); }
+.field-check   { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; font-weight: 700; color: var(--ink); cursor: pointer; text-transform: lowercase; }
+.field-check--sm { font-size: 0.75rem; color: var(--mid); }
+
+.field-input, .field-textarea, .field-select {
+  width: 100%;
+  border-radius: var(--r-input);
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--ink);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field-input::placeholder, .field-textarea::placeholder { color: var(--faint); }
+.field-input:focus, .field-textarea:focus, .field-select:focus {
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 2px var(--accent-l);
+}
+.field-input:disabled { opacity: 0.5; cursor: not-allowed; }
+.field-input  { height: 2.25rem; }
+.field-textarea { min-height: 5rem; padding: 0.5rem 0.75rem; resize: vertical; }
+.field-number {
+  width: 5rem;
+  border-radius: var(--r-input);
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--ink);
+  outline: none;
+}
+.field-number:focus { border-color: var(--c-accent); box-shadow: 0 0 0 2px var(--accent-l); }
+
+/* ═══ TOGGLE ══════════════════════════════════════════════════════ */
+
+.toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 3rem;
+  height: 1.75rem;
+  border-radius: 1rem;
+  /* die-cut sticker treatment: white halo + soft drop shadow, no border —
+     matches cards, buttons and badges */
+  border: none;
+  box-shadow: 0 0 0 2px #fff, 0 3px 7px -1px rgba(90,55,20,0.30);
+  cursor: pointer;
+  transition: background 0.18s;
+  flex-shrink: 0;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+}
+.toggle--on  { background: var(--c-accent); }
+.toggle--off { background: color-mix(in srgb, var(--ink) 15%, white); }
+.toggle__knob {
+  position: absolute;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  transition: left 0.18s;
+}
+.toggle--on  .toggle__knob { left: calc(100% - 1.25rem - 1px); }
+.toggle--off .toggle__knob { left: 1px; }
+
+/* backward compat */
+.sq-toggle       { position: relative; display: inline-flex; align-items: center; width: 3rem; height: 1.75rem; border-radius: 1rem; border: none; box-shadow: 0 0 0 2px #fff, 0 3px 7px -1px rgba(90,55,20,0.30); cursor: pointer; transition: background 0.18s; flex-shrink: 0; }
+.sq-toggle--on   { background: var(--c-accent); }
+.sq-toggle--off  { background: color-mix(in srgb, var(--ink) 15%, white); }
+.sq-toggle__knob { position: absolute; width: 1.25rem; height: 1.25rem; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: left 0.18s; }
+.sq-toggle--on  .sq-toggle__knob { left: calc(100% - 1.25rem - 1px); }
+.sq-toggle--off .sq-toggle__knob { left: 1px; }
+
+/* ═══ CHANNEL LOGO ════════════════════════════════════════════════ */
+
+/* Base ch-logo: sized in context */
+.ch-logo { display: block; flex-shrink: 0; }
+
+/* Feed-card logo: larger, in full brand color (matches the colored source
+   chips in the design) */
+.ch-logo--feed {
+  width: 20px;
+  height: 20px;
+}
+
+/* backward-compat text badge (kept for any external use) */
+.ch-badge, .sq-ch-badge {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 800;
+  font-size: 0.6875rem;
+  color: #fff;
+  border: 1px solid rgba(0,0,0,0.18);
+  padding: 1px 9px;
+  border-radius: var(--r-pill);
+  text-transform: lowercase;
+}
+
+/* ═══ FRESH COUNT / UNREAD ════════════════════════════════════════ */
+
+.feed-unread-count {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--mid);
+}
+
+/* backward compat */
+.fresh-badge, .sq-fresh-badge {
+  background: var(--c-accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  padding: 5px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--accent-d);
+}
+.unread-dot, .sq-unread-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--c-accent);
+  box-shadow: var(--halo-sm), 0 2px 5px rgba(150,45,35,.35);
+  flex-shrink: 0;
+}
+
+/* ═══ MENTION CARD ════════════════════════════════════════════════ */
+
+.mention {
+  position: relative;
+  background: #fff;
+  border-radius: var(--r-card);
+  border: none;
+  box-shadow: var(--shadow-cut);
+  padding: 1rem;
+  margin-bottom: var(--gap-cards);
+  transition: box-shadow 0.14s;
+}
+.mention--clickable { cursor: pointer; }
+.mention--clickable:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
+@media (hover: hover) {
+  .mention:hover { box-shadow: 0 0 0 5px #fff, 0 20px 34px -10px rgba(90,55,20,0.5); }
+  /* subtle tint advertises that the whole card is a navigation target */
+  .mention--clickable:hover { background: color-mix(in srgb, var(--c-accent) 4%, #fff); }
+}
+/* Read mentions fade back; unread stay at full strength — the opacity shift is
+   the scan cue (no coloured edge bar). */
+.mention--read { opacity: 0.62; }
+
+.mention__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.625rem;
+  flex-wrap: wrap;
+}
+.mention__time    { font-size: 0.75rem; font-weight: 700; color: var(--faint); margin-left: auto; text-decoration: none; }
+@media (hover: hover) {
+  .mention__time:hover { text-decoration: underline; }
+}
+.mention__phrase  { font-size: 0.75rem; font-weight: 700; font-style: italic; color: var(--mid); }
+.mention__monitor { font-size: 0.75rem; font-weight: 600; font-style: italic; color: var(--faint); }
+
+.mention__title-link {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mention__title-link:hover { text-decoration: underline; }
+
+.mention__body { margin-bottom: 0.75rem; }
+.mention__title { font-size: 0.875rem; font-weight: 600; color: var(--ink); margin-bottom: 0.25rem; line-height: 1.35; }
+.mention__title a:hover { text-decoration: underline; }
+.mention__on { font-weight: 600; color: var(--mid); }
+.mention__text {
+  font-size: 0.875rem;
+  color: var(--ink);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  font-weight: 500;
+}
+.mention__text--clamped { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Inline markdown (see src/lib/markdown.tsx) — bold/italic inherit surrounding
+   type; code and links get their own treatment. Values match the shadcn
+   `muted`/`primary` tokens the component used to reach via Tailwind utilities. */
+.md-code { border-radius: 0.25rem; background: hsl(var(--muted)); padding: 0.125rem 0.25rem; font-size: 0.85em; }
+.md-link { color: hsl(var(--primary)); }
+.md-link:hover { text-decoration: underline; }
+.mention__expand {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--c-accent);
+  cursor: pointer;
+  margin-top: 0.25rem;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+}
+.mention__expand:hover { text-decoration: underline; }
+.mention__ai-reason { font-size: 0.75rem; color: var(--faint); font-style: italic; margin-top: 0.375rem; font-weight: 600; }
+
+.mention__footer { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.mention__tags   { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; }
+.mention__actions { display: flex; align-items: center; gap: 0.75rem; font-size: 0.75rem; font-weight: 700; color: var(--mid); }
+/* A real button affordance (not a bare text link): pill, border, icon, and a
+   comfortable tap target — this is the most-used control in the triage loop. */
+.mention__read-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--mid);
+  padding: 0.3125rem 0.6875rem;
+  min-height: 1.875rem;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.mention__read-btn:hover { border-color: var(--c-accent); color: var(--c-accent); background: var(--accent-t); }
+
+/* ═══ MENTION DETAIL PAGE ═════════════════════════════════════════ */
+
+.mention-detail { display: flex; flex-direction: column; gap: 0.875rem; margin-top: 0.25rem; }
+.mention-detail__channel { font-size: 0.8125rem; font-weight: 700; color: var(--mid); text-transform: capitalize; }
+.mention-detail__title { font-size: 1.125rem; font-weight: 700; color: var(--ink); line-height: 1.3; margin: 0; }
+.mention-detail__title a { color: inherit; text-decoration: none; }
+.mention-detail__title a:hover { text-decoration: underline; }
+/* Detail view shows the whole post — never clamp it. */
+.mention-detail__text { white-space: pre-wrap; }
+.mention-detail__tags { margin: 0; }
+.mention-detail__author { font-size: 0.8125rem; font-weight: 700; color: var(--mid); margin: 0; }
+.mention-detail__author a { color: inherit; }
+.mention-detail__author a:hover { color: var(--c-accent); }
+.mention-detail__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; padding-top: 0.25rem; }
+
+/* ═══ DATA TABLE ══════════════════════════════════════════════════ */
+
+.data-table-wrap {
+  border-radius: var(--r-card);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-hard);
+}
+.data-table { width: 100%; font-size: 0.875rem; border-collapse: collapse; }
+.data-table thead { background: #f8fafc; }
+.data-table th { text-align: left; padding: 0.75rem 1rem; font-weight: 600; color: var(--ink); }
+.data-table th:last-child { text-align: right; }
+.data-table td { padding: 0.75rem 1rem; }
+.data-table td:last-child { text-align: right; }
+.data-table tbody tr { border-top: 1px solid var(--border); }
+.data-table tbody tr:first-child { border-top: none; }
+.data-table .mono { font-family: ui-monospace, monospace; font-weight: 700; color: var(--ink); }
+.data-table .dim  { font-weight: 600; color: var(--mid); }
+
+/* ═══ FEED PAGE ═══════════════════════════════════════════════════ */
+
+.feed-layout { display: flex; }
+.feed-sidebar {
+  width: 16rem;
+  flex-shrink: 0;
+  padding: 1.5rem 1rem;
+  /* Chrome around the feed, not a competing scroller: pin it to the
+     viewport so the single app-content scroller handles the feed itself. */
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100dvh;
+  overflow-y: auto;
+  /* airy: let the citrus backdrop show through the filter rail */
+  background: transparent;
+}
+.feed-sidebar-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+  margin-bottom: 1rem;
+}
+.feed-main { flex: 1; min-width: 0; }
+.feed-hd { display: flex; align-items: baseline; gap: 0.625rem; justify-content: flex-start; padding: 1.25rem 1rem 1.25rem; }
+.feed-count { font-size: 0.8125rem; font-weight: 700; color: var(--faint); }
+.feed-sidebar-hd { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1rem; }
+.feed-sidebar-hd .feed-sidebar-label { margin-bottom: 0; }
+@media (min-width: 640px) { .feed-hd { padding: 1.25rem 1.5rem 1.25rem; } }
+.feed-content { padding: 0 1rem 1.5rem; }
+@media (min-width: 640px) { .feed-content { padding: 0 1.5rem 1.5rem; } }
+.feed-inner { max-width: 48rem; margin: 0 auto; }
+/* Backlog notice: the AI filter is behind and holding mentions out of the feed.
+   Quiet, informational — not an error. */
+.feed-pending {
+  margin-bottom: var(--gap-cards);
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--r-input);
+  background: var(--accent-t);
+  color: var(--accent-d);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+.load-more-row { display: flex; justify-content: center; padding-top: 1rem; }
+
+.filter-bar { display: flex; align-items: center; gap: 0.5rem; padding: 0 1rem 0.75rem; }
+.filter-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4375rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--r-pill);
+  border: none;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: var(--shadow-float);
+  transition: box-shadow 0.15s;
+}
+.filter-toggle-btn:hover { box-shadow: 0 0 0 4px #fff, 0 10px 16px -5px rgba(120,70,25,0.5); }
+.filter-count-dot {
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3125rem;
+  border-radius: var(--r-pill);
+  background: var(--c-accent);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.filter-clear-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--mid);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s;
+}
+.filter-clear-btn:hover { color: var(--ink); }
+.filter-panel-mobile { margin: 0 1rem 1.375rem; padding: 1rem; border-radius: var(--r-card); border: none; background: #fff; box-shadow: var(--shadow-cut); }
+
+.filter-form { display: flex; flex-direction: column; gap: 1.25rem; }
+.f-pill-group { display: flex; flex-wrap: wrap; gap: 0.375rem; }
+
+.f-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--r-pill);
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--mid);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.f-pill:hover { border-color: color-mix(in srgb, var(--c-accent) 60%, transparent); color: var(--ink); }
+.f-pill--on  { background: var(--c-accent); color: #fff; border-color: var(--c-accent); }
+.f-pill--on:hover { background: var(--accent-d); border-color: var(--accent-d); color: #fff; }
+
+/* channel logo inside filter pill — grayscale when off, color when on */
+.f-pill .ch-logo {
+  width: 14px;
+  height: 14px;
+  filter: grayscale(1) opacity(0.5);
+  transition: filter 0.15s;
+}
+
+/* channel pill variant: white bg when active so brand-color logo stands out */
+.f-pill--ch.f-pill--on {
+  background: var(--accent-t);
+  border-color: var(--c-accent);
+  color: var(--ink);
+}
+.f-pill--ch:hover .ch-logo { filter: grayscale(0.3) opacity(0.8); }
+.f-pill--ch.f-pill--on .ch-logo { filter: none; }
+
+.f-show-more {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--mid);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  text-decoration: none;
+  transition: color 0.15s;
+  align-self: flex-start;
+}
+.f-show-more:hover { color: var(--c-accent); text-decoration: underline; }
+
+/* ═══ ALERTS / DESTINATIONS ═══════════════════════════════════════ */
+
+/* Destinations render as a single grouped list on a subtle surface — one crisp
+   element with hairline-divided rows, rather than white pills floating on the
+   white card. (Edges/dividers use color-mix from --c-ink, not var(--border):
+   index.css shadows --border with a bare HSL triplet, so it's unusable here.) */
+.dest-list { display: flex; flex-direction: column; border-radius: var(--r-input); background: var(--bg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-ink) 11%, transparent); overflow: hidden; }
+.dest-row { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0.875rem; border: none; border-bottom: 1px solid color-mix(in srgb, var(--c-ink) 9%, transparent); background: transparent; box-shadow: none; }
+.dest-row:last-child { border-bottom: none; }
+.dest-row__info    { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; font-weight: 700; color: var(--ink); }
+.dest-row__icon    { color: var(--mid); }
+.dest-row__freq    { font-weight: 600; color: var(--faint); }
+.dest-row__actions { display: flex; align-items: center; gap: 0.25rem; }
+
+.webpush-help { border-radius: 0.75rem; padding: 0.75rem; font-size: 0.875rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.webpush-help--ios    { border: 2px solid #F59E0B; background: #FFFBEB; }
+.webpush-help--normal { border: 1px solid var(--border); background: #fff; }
+.webpush-help__title  { font-weight: 600; color: var(--ink); }
+.webpush-help__text   { font-weight: 600; color: var(--mid); }
+
+/* ═══ SETTINGS ════════════════════════════════════════════════════ */
+
+/* A titled block on the settings page (notifications, AI filter, …). */
+.settings-section { margin-bottom: 2rem; }
+.settings-section:last-child { margin-bottom: 0; }
+.settings-section__title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  margin-bottom: 0.25rem;
+}
+.settings-section__desc {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--mid);
+  margin-bottom: 0.875rem;
+}
+
+.settings-card {
+  border-radius: var(--r-card);
+  padding: 1rem;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-hard);
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+@media (min-width: 640px) { .settings-card { padding: 1.5rem; } }
+.settings-row  { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.settings-row__title { font-weight: 600; color: var(--ink); }
+.settings-row__desc  { font-size: 0.75rem; font-weight: 600; color: var(--faint); margin-top: 0.125rem; }
+.settings-row__desc--error { color: hsl(0 69% 50%); }
+.settings-btn-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding-top: 0.25rem; }
+/* Secondary actions sit on the white settings card, where the default sticker
+   (white halo + drop shadow) reads as white-on-white. Use a neutral tonal fill
+   so they read clearly as buttons while staying subordinate to the coral
+   primary. (Tonal fill, not a border — var(--border) is unusable here.) */
+.settings-card .btn--outline {
+  background: color-mix(in srgb, var(--c-ink) 6%, white);
+  color: var(--ink);
+  box-shadow: none;
+}
+.settings-card .btn--outline:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--c-ink) 11%, white);
+  box-shadow: none;
+}
+.test-result      { border-radius: 0.75rem; padding: 0.75rem; font-size: 0.875rem; }
+.test-result--ok  { border: 1px solid var(--accent-d); background: var(--accent-l); }
+.test-result--err { border: 1px solid hsl(0 69% 35%); background: hsl(0 69% 97%); }
+.test-result__ok  { font-weight: 800; color: var(--accent-d); }
+.test-result__err { font-weight: 800; color: hsl(0 69% 38%); }
+.test-result__detail { font-weight: 600; }
+
+/* ═══ GENERIC HELPERS ═════════════════════════════════════════════ */
+
+.stack    { display: flex; flex-direction: column; gap: 1rem; }
+.stack--sm { display: flex; flex-direction: column; gap: 0.5rem; }
+.stack--lg { display: flex; flex-direction: column; gap: 1.5rem; }
+.row      { display: flex; align-items: center; gap: 0.5rem; }
+.row--3   { display: flex; align-items: center; gap: 0.75rem; }
+.row--4   { display: flex; align-items: center; gap: 1rem; }
+.row--between { justify-content: space-between; }
+.row--end     { justify-content: flex-end; }
+.row--wrap    { flex-wrap: wrap; }
+/* padding-bottom clears the sticky .dialog-footer so the last section can
+   scroll fully above it (not be left hidden behind the pinned action row). */
+.dialog-form  { display: flex; flex-direction: column; gap: 1rem; padding: 0.5rem 0 3.5rem; }
+.form-grid-2  { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+/* Pin the dialog action row to the bottom of the (scrolling) dialog so Save is
+   always reachable in long config forms. The negative margins bleed it across
+   the DialogContent's p-6 padding; bottom:0 keeps it stuck while the body
+   scrolls underneath. */
+.dialog-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: 0.25rem -1.5rem -1.5rem;
+  padding: 0.875rem 1.5rem;
+  background: #fff;
+  border-top: 1px solid var(--border);
+}
+
+/* ═══ MONITOR / CHANNEL CARDS (mobile) ═══════════════════════════ */
+
+.item-cards { display: flex; flex-direction: column; gap: var(--gap-cards); }
+.item-card-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+.item-card-info { min-width: 0; }
+.item-card-name { font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-card-name--mono { font-family: ui-monospace, monospace; }
+.item-card-sub { font-size: 0.75rem; font-weight: 600; color: var(--faint); margin-top: 0.125rem; }
+.item-card-sub--error { color: hsl(0 69% 50%); }
+.item-card-tags { display: flex; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.375rem; }
+.item-card-actions { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
+
+/* ── Monitor card ────────────────────────────────────────────────── */
+.mon-card { display: flex; flex-direction: column; gap: 0.625rem; }
+.mon-card--inactive { opacity: 0.65; }
+.mon-card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
+.mon-card__terms { display: flex; flex-wrap: wrap; gap: 0.375rem; min-width: 0; }
+
+/* Channel scoping shown as the full icon set: lit = collected, grey = not. */
+.mon-card__channels-row { display: flex; align-items: center; gap: 0.625rem; flex-wrap: wrap; }
+.mon-channels { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.mon-ch { width: 20px; height: 20px; transition: filter 0.12s; }
+.mon-ch--on  { filter: none; }
+.mon-ch--off { filter: grayscale(1) opacity(0.32); }
+.mon-flag { font-size: 0.6875rem; font-weight: 700; color: var(--faint); text-transform: lowercase; }
+
+/* AI filter prompt: its own line, truncated to a few lines with show more. */
+.mon-ai { display: flex; flex-direction: column; gap: 0.125rem; }
+.mon-ai__label {
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent2-d);
+}
+.mon-ai__text { font-size: 0.8125rem; font-weight: 600; color: var(--mid); line-height: 1.45; white-space: pre-wrap; }
+.mon-ai__text--clamped { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.mon-ai__more {
+  align-self: flex-start;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--c-accent);
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 0.125rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.mon-ai__more:hover { text-decoration: underline; }
+
+/* ═══ SECTION DIVIDER (in dialogs) ═══════════════════════════════ */
+
+.section-sep { padding-top: 1rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem; }
+.section-sep__title { font-size: 0.875rem; font-weight: 600; color: var(--ink); }
+.section-sep__desc  { font-size: 0.75rem; font-weight: 600; color: var(--faint); }
+.backfill-row { display: flex; align-items: center; gap: 0.5rem; }
+
+.cleanup-list {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--mid);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 8rem;
+  overflow-y: auto;
+  border-radius: 0.75rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+}
+.cleanup-list li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cleanup-list strong { font-weight: 600; color: var(--ink); }
+.cleanup-summary { font-size: 0.875rem; font-weight: 700; color: var(--ink); }
+
+.channel-name-link { background: none; border: none; padding: 0; font: inherit; font-weight: 800; color: var(--ink); cursor: pointer; text-align: left; max-width: 100%; }
+@media (hover: hover) {
+  .channel-name-link:hover { color: var(--c-accent); text-decoration: underline; }
+}
+/* When the link doubles as the mobile card title it must stay a block so the
+   ellipsis truncation from `.item-card-name` applies. */
+.channel-name-link.item-card-name { display: block; }
+.channels-table__error { color: hsl(0 69% 50%); font-size: 0.75rem; font-weight: 700; }
+
+/* ── Channel detail page ─────────────────────────────────────────────────── */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--mid);
+  margin-bottom: 0.75rem;
+}
+.back-link:hover { color: var(--ink); }
+.channel-detail__header { margin-bottom: 1rem; }
+.channel-detail__summary { margin-bottom: 1.5rem; }
+.channel-summary { display: flex; flex-wrap: wrap; gap: 1.5rem; margin: 0; }
+.channel-summary div { display: flex; flex-direction: column; gap: 0.125rem; }
+.channel-summary dt { font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--faint); }
+.channel-summary dd { margin: 0; font-size: 0.875rem; font-weight: 700; color: var(--ink); }
+.channel-summary__error { color: hsl(0 69% 50%); }
+
+/* Channel-level degraded banner — prominent at the top of the detail page. */
+.channel-banner {
+  display: flex;
+  align-items: baseline;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--r-card);
+  border: 1px solid color-mix(in srgb, hsl(38 92% 50%) 45%, var(--border));
+  background: color-mix(in srgb, hsl(38 92% 50%) 12%, #fff);
+}
+.channel-banner__label {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: hsl(28 80% 38%);
+}
+.channel-banner__text { font-size: 0.8125rem; font-weight: 700; color: var(--ink); }
+
+/* ── Collection targets (per-target health view) ─────────────────────────── */
+.targets { display: flex; flex-direction: column; gap: 0.5rem; }
+.targets__bar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.targets__count { font-size: 0.75rem; font-weight: 600; color: var(--faint); display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.targets__pace { font-size: 0.6875rem; font-weight: 600; color: var(--mid); font-variant-numeric: tabular-nums; }
+.targets__pace-paused { color: hsl(38 92% 42%); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+.targets__controls { display: flex; align-items: center; gap: 0.5rem; }
+.targets__toggle { display: flex; align-items: center; gap: 0.375rem; font-size: 0.75rem; font-weight: 600; color: var(--mid); cursor: pointer; user-select: none; }
+.targets__note { font-size: 0.8125rem; font-weight: 600; color: var(--faint); padding: 0.5rem 0; }
+.targets__note--error { color: hsl(0 69% 50%); }
+.targets__descriptor {
+  display: inline-block;
+  max-width: 22rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  font-weight: 700;
+  color: var(--ink);
+}
+.targets__card-hd { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.375rem; }
+.targets__card-stats { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; margin: 0.5rem 0 0; }
+.targets__card-stats div { display: flex; flex-direction: column; gap: 0.125rem; }
+.targets__card-stats dt { font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--faint); }
+.targets__card-stats dd { margin: 0; font-size: 0.8125rem; font-weight: 700; color: var(--ink); }
+.targets__error { margin: 0.5rem 0 0; font-size: 0.75rem; font-weight: 600; color: hsl(0 69% 50%); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Log viewer (per-service recent log output) ──────────────────────────── */
+.log-viewer { display: flex; flex-direction: column; gap: 0.5rem; }
+.log-viewer__bar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.log-viewer__meta { display: flex; align-items: center; gap: 0.75rem; font-size: 0.75rem; font-weight: 600; color: var(--faint); }
+.log-viewer__controls { display: flex; align-items: center; gap: 0.5rem; }
+.log-viewer__toggle { display: flex; align-items: center; gap: 0.375rem; font-size: 0.75rem; font-weight: 600; color: var(--mid); cursor: pointer; user-select: none; }
+.log-viewer__pre {
+  margin: 0;
+  height: 28rem;
+  max-height: 60vh;
+  overflow: auto;
+  background: var(--c-ink);
+  color: color-mix(in srgb, var(--c-ink) 8%, white);
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.log-viewer__line { display: block; }
+.log-viewer__empty { color: color-mix(in srgb, var(--c-ink) 35%, white); font-style: italic; }
+.log-viewer__error { color: hsl(0 70% 72%); font-weight: 600; }
+
+/* ── Toasts ───────────────────────────────────────────────────────────────── */
+.toast-viewport {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+.toast--success { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+.toast--error   { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+.toast--info    { border-color: #bfdbfe; background: #eff6ff; color: #1e40af; }

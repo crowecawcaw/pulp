@@ -1,0 +1,2149 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Pulp API",
+    "description": "Pulp social-listening HTTP API. This spec is generated from the Rust backend and is the authoritative API contract.",
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/admin/backfill": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "trigger_backfill",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackfillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Single-channel backfill complete"
+          },
+          "202": {
+            "description": "All-channel backfill accepted"
+          }
+        }
+      }
+    },
+    "/api/admin/collect/{channel}": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "trigger_collect",
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "path",
+            "description": "Channel name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collection run triggered"
+          }
+        }
+      }
+    },
+    "/api/admin/notify": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Run a single notifier pass synchronously: fan every feed-visible,\nun-notified mention out to its workspace's notifications, then mark them\nnotified. Mirrors the background loop so the pipeline can be driven\ndeterministically.",
+        "operationId": "trigger_notify",
+        "responses": {
+          "200": {
+            "description": "Notify pass executed"
+          }
+        }
+      }
+    },
+    "/api/channels": {
+      "get": {
+        "tags": [
+          "channels"
+        ],
+        "summary": "`GET /api/channels` — list every channel config (global, not workspace-scoped).",
+        "operationId": "listChannels",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChannelConfig"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/channels/{channel}": {
+      "get": {
+        "tags": [
+          "channels"
+        ],
+        "summary": "`GET /api/channels/:channel` — fetch a single channel config by name.\nReturns 404 if the channel has never been configured.",
+        "operationId": "getChannel",
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "path",
+            "description": "Channel name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelConfig"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": ""
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "channels"
+        ],
+        "summary": "`PUT /api/channels/:channel` — create or update a channel config. Body fields\nare all optional: `enabled`, `poll_interval` (seconds, default 900), and\n`credentials` (channel-specific JSON). For Reddit the only (optional) credential\nis `{ \"user_agent\" }` — Reddit's public search needs no client id/secret. For\nGitHub the credentials are a `{ \"token\", ... }` filter object. When `enabled` is\nomitted the channel's current enabled state is preserved. When `credentials` is\nomitted the previously-stored credentials are preserved (not wiped) — pass an\nexplicit `credentials` object to change them.",
+        "operationId": "upsert",
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "path",
+            "description": "Channel name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelConfig"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/channels/{channel}/backfill": {
+      "post": {
+        "tags": [
+          "channels"
+        ],
+        "operationId": "backfill",
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "path",
+            "description": "Channel name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackfillBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackfillResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/channels/{channel}/cleanup": {
+      "post": {
+        "tags": [
+          "channels"
+        ],
+        "operationId": "cleanup",
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "path",
+            "description": "Channel name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CleanupBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/channels/{channel}/targets": {
+      "get": {
+        "tags": [
+          "channels"
+        ],
+        "summary": "`GET /api/channels/{channel}/targets` — per-target collection status for a\nchannel (watermark, last success/attempt, consecutive failures, last error,\nderived health) plus each target's open backfill jobs. Backend-only status view\nfor the targeted (auto-recovering) collector pipeline.",
+        "operationId": "listChannelTargets",
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "path",
+            "description": "Channel name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TargetsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/config/ai": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "operationId": "get_ai_config",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConfigView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "config"
+        ],
+        "operationId": "update_ai_config",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiConfigUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConfigView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid settings (e.g. enabled without base_url/model)"
+          }
+        }
+      }
+    },
+    "/api/config/ai/test": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "operationId": "test_ai_config",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiTestResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/logs/{service}": {
+      "get": {
+        "tags": [
+          "logs"
+        ],
+        "summary": "`GET /api/logs/{service}` — last N log lines for `service`.",
+        "description": "`service` accepts any channel name (`reddit`, `hackernews`, `github`) and\nfuture services (`ai_filter`/`llm`). Unknown services → 404. The number of\nlines is capped (default 200, max 2000).",
+        "operationId": "getServiceLogs",
+        "parameters": [
+          {
+            "name": "service",
+            "in": "path",
+            "description": "Service id: a channel name or ai_filter/llm",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Max lines to return (default 200, max 2000)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown service"
+          }
+        }
+      }
+    },
+    "/api/mentions": {
+      "get": {
+        "tags": [
+          "mentions"
+        ],
+        "summary": "`GET /api/mentions` — list mentions (keyset-paginated by the compound\n`before`/`before_id` cursor).",
+        "operationId": "listMentions",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "monitor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "description": "Upper bound (exclusive) on the effective timestamp (`published_at`,\nor `ingested_at` when `published_at` is null). For the feed's\nkeyset-pagination cursor, pair this with `before_id` — the `id` of\nthe last item on the previous page — so rows tied on the effective\ntimestamp are still visited exactly once when paging one page at a\ntime; `before` alone has no tiebreak.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            }
+          },
+          {
+            "name": "before_id",
+            "in": "query",
+            "description": "Tiebreaker id paired with `before` for keyset pagination — the `id`\nof the last item on the previous page. See `before`.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "description": "Lower bound: return mentions published at or after this epoch.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            }
+          },
+          {
+            "name": "read",
+            "in": "query",
+            "description": "Filter by read state: `true` = read only, `false` = unread only,\nomitted = both.",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "ai",
+            "in": "query",
+            "description": "AI verdict filter: omitted/`visible` = feed default (no verdict or\n`accepted`); `all` = everything; `pending` / `accepted` / `rejected`\n= exactly that verdict.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MentionPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mentions/pending-count": {
+      "get": {
+        "tags": [
+          "mentions"
+        ],
+        "summary": "`GET /api/mentions/pending-count` — size + age of the AI-filter backlog,\ndriving the feed's \"N pending AI filter\" banner.",
+        "operationId": "mentionsPendingCount",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "description": "Scope the count to a single workspace; omitted = all workspaces.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingCount"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mentions/{id}": {
+      "get": {
+        "tags": [
+          "mentions"
+        ],
+        "summary": "`GET /api/mentions/:id` — fetch a single mention (used by the mention\ndetail page that web-push notifications deep-link to).",
+        "operationId": "getMention",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Mention id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mention"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mention not found"
+          }
+        }
+      }
+    },
+    "/api/mentions/{id}/read": {
+      "put": {
+        "tags": [
+          "mentions"
+        ],
+        "summary": "`PUT /api/mentions/:id/read` — mark a mention read or unread.",
+        "operationId": "setMentionRead",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Mention id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetReadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mention"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mention not found"
+          }
+        }
+      }
+    },
+    "/api/monitors": {
+      "get": {
+        "tags": [
+          "monitors"
+        ],
+        "summary": "`GET /api/monitors?workspace_id=…` — list monitors in a workspace.\nThe `workspace_id` query param is required.",
+        "operationId": "listMonitors",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Monitor"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "monitors"
+        ],
+        "summary": "`POST /api/monitors` — create a monitor watch. Body is [`CreateMonitor`]:\n`workspace_id` and `terms` (the match-any keyword list) are required;\n`channels` (empty/omitted = all channels), `exact_match`, `case_sensitive`,\n`exclude_terms` are optional.",
+        "operationId": "createMonitor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMonitor"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Monitor"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/monitors/{id}": {
+      "get": {
+        "tags": [
+          "monitors"
+        ],
+        "summary": "`GET /api/monitors/:id` — fetch a single monitor.",
+        "operationId": "getMonitor",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Monitor id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Monitor"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Monitor not found"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "monitors"
+        ],
+        "summary": "`PUT /api/monitors/:id` — update a monitor watch. Body is [`UpdateMonitor`];\nevery field is optional and only provided fields are changed.",
+        "operationId": "updateMonitor",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Monitor id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMonitor"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Monitor"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "monitors"
+        ],
+        "summary": "`DELETE /api/monitors/:id` — delete a monitor watch (cascades to its mentions).",
+        "operationId": "deleteMonitor",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Monitor id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          }
+        }
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "operationId": "listNotifications",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Notification"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "operationId": "createNotification",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNotification"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Notification"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/test": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "operationId": "sendTestNotification",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestNotificationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/{id}": {
+      "delete": {
+        "tags": [
+          "notifications"
+        ],
+        "operationId": "deleteNotification",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Notification id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          }
+        }
+      }
+    },
+    "/api/push/vapid-public-key": {
+      "get": {
+        "tags": [
+          "push"
+        ],
+        "operationId": "getVapidPublicKey",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VapidPublicKey"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "`GET /api/workspaces` — list all workspaces (not workspace-scoped).",
+        "operationId": "listWorkspaces",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Workspace"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "`POST /api/workspaces` — create a workspace. Body: `{ name, description? }`.",
+        "operationId": "createWorkspace",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkspaceBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workspace"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{id}": {
+      "put": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "`PUT /api/workspaces/:id` — rename/update a workspace. Body: `{ name, description? }`.",
+        "operationId": "updateWorkspace",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Workspace id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkspaceBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workspace"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "`DELETE /api/workspaces/:id` — delete a workspace (cascades to its monitors and notifications).",
+        "operationId": "deleteWorkspace",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Workspace id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AiConfigUpdate": {
+        "type": "object",
+        "description": "Partial update. Every field is optional; omitted (or null) fields are left\nunchanged. For `api_key`, an empty string clears the stored key.",
+        "properties": {
+          "api_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "base_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AiConfigView": {
+        "type": "object",
+        "description": "AI-filter settings as exposed to clients. The API key is never returned;\n`api_key_set` reports only whether one is configured.",
+        "required": [
+          "enabled",
+          "base_url",
+          "model",
+          "api_key_set"
+        ],
+        "properties": {
+          "api_key_set": {
+            "type": "boolean"
+          },
+          "base_url": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "model": {
+            "type": "string"
+          }
+        }
+      },
+      "AiTestResult": {
+        "type": "object",
+        "description": "Result of a `test` call: a sample verdict on success, or an error message.",
+        "required": [
+          "ok"
+        ],
+        "properties": {
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verdict": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "BackfillBody": {
+        "type": "object",
+        "required": [
+          "days"
+        ],
+        "properties": {
+          "days": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "BackfillJob": {
+        "type": "object",
+        "description": "A durable backfill job: a half-open `[range_start, range_end)` window of one\ntarget that still needs older pages walked. Survives restarts; resumes from\n`next_cursor`.",
+        "required": [
+          "id",
+          "target_id",
+          "range_start",
+          "range_end",
+          "state",
+          "pages_done",
+          "attempts",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "attempts": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "string"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `after` token to resume paging from."
+          },
+          "pages_done": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "range_end": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Newer bound — shrinks toward `range_start` as older pages are banked."
+          },
+          "range_start": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Older bound (inclusive)."
+          },
+          "state": {
+            "type": "string",
+            "description": "`open` | `done` | `abandoned`."
+          },
+          "target_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "BackfillRequest": {
+        "type": "object",
+        "required": [
+          "since"
+        ],
+        "properties": {
+          "channel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "since": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "BackfillResult": {
+        "type": "object",
+        "description": "Result of a channel backfill: a human-readable status message.",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ChannelBody": {
+        "type": "object",
+        "properties": {
+          "credentials": {},
+          "enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "poll_interval": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "ChannelConfig": {
+        "type": "object",
+        "required": [
+          "channel",
+          "enabled",
+          "credentials",
+          "poll_interval",
+          "updated_at",
+          "max_backfill_days"
+        ],
+        "properties": {
+          "caught_up_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The caught-up watermark: how far this channel is contiguously\ningested. Distinct from `last_polled_at`, which is merely the last\nattempt time."
+          },
+          "channel": {
+            "type": "string"
+          },
+          "credentials": {},
+          "enabled": {
+            "type": "boolean"
+          },
+          "error_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_polled_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "max_backfill_days": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "poll_interval": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updated_at": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ChannelHealthSummary": {
+        "type": "object",
+        "description": "Per-health counts plus a ready-to-display degraded message, summarizing a\nchannel's targets at time `now`. The `message` is `None` when nothing is\ndegraded; otherwise it leads with \"rate-limited\" when any target is throttled\n(so the banner reads as a throttle), else \"degraded\".",
+        "required": [
+          "total",
+          "healthy",
+          "idle",
+          "throttled",
+          "failing",
+          "degraded"
+        ],
+        "properties": {
+          "degraded": {
+            "type": "integer",
+            "description": "Targets that are throttled or failing (the banner count).",
+            "minimum": 0
+          },
+          "failing": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "healthy": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "idle": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A human-readable degraded summary, or `None` when all targets are fine."
+          },
+          "throttled": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "CleanupBody": {
+        "type": "object",
+        "required": [
+          "dry_run"
+        ],
+        "properties": {
+          "dry_run": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CleanupPreview": {
+        "type": "object",
+        "description": "Preview returned by a dry-run cleanup: how many mentions would be removed,\nplus up to 10 samples.",
+        "required": [
+          "count",
+          "sample"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sample": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MentionSample"
+            }
+          }
+        }
+      },
+      "CleanupResponse": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/CleanupPreview"
+          },
+          {
+            "$ref": "#/components/schemas/CleanupResult"
+          }
+        ],
+        "description": "A cleanup call returns a preview on `dry_run` and a delete count otherwise.\nUntagged so the wire shape is exactly one of the two inner objects."
+      },
+      "CleanupResult": {
+        "type": "object",
+        "description": "Result of a real (non-dry-run) cleanup: how many mentions were deleted.",
+        "required": [
+          "deleted"
+        ],
+        "properties": {
+          "deleted": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "CollectorTarget": {
+        "type": "object",
+        "description": "A durable collection target: one consolidated upstream request (an OR-batched\nglobal search, or a per-sub search) that the targeted\nrunner pages, banks progress for, and tracks sticky failure status on.",
+        "required": [
+          "id",
+          "channel",
+          "kind",
+          "descriptor",
+          "consecutive_failures",
+          "updated_at"
+        ],
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "confirmed_watermark": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Timestamp below which this target has been contiguously ingested. The\nchannel is \"caught up\" only when all its targets' watermarks are recent."
+          },
+          "consecutive_failures": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "descriptor": {
+            "type": "string",
+            "description": "Sub-list or query — human-readable, and the basis for `id`."
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable id derived from `channel + kind + descriptor`."
+          },
+          "kind": {
+            "type": "string",
+            "description": "`feed` | `search`."
+          },
+          "last_attempt_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Sticky: a different target succeeding does NOT clear this. Display/health\nonly — pacing is governed globally by the adaptive rate limiter, not a\nper-target backoff."
+          },
+          "last_success_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "updated_at": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "CreateMonitor": {
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "terms"
+        ],
+        "properties": {
+          "ai_filter_prompt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "AI relevance prompt; empty/whitespace is normalized to \"disabled\"."
+          },
+          "case_sensitive": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "channel_settings": {
+            "description": "Per-channel collection overrides keyed by channel name."
+          },
+          "channels": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "exact_match": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "exclude_terms": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "terms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Match-any term list (each a bare literal phrase). A post matches if it\ncontains ANY term and none of `exclude_terms`."
+          },
+          "workspace_id": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateNotification": {
+        "type": "object",
+        "description": "Create request for a notification.",
+        "required": [
+          "workspace_id",
+          "kind",
+          "config"
+        ],
+        "properties": {
+          "config": {
+            "description": "Kind-specific config JSON (webpush: `{endpoint,p256dh,auth}`; webhook:\n`{url}`)."
+          },
+          "kind": {
+            "type": "string",
+            "description": "`webpush` | `webhook`."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspace_id": {
+            "type": "string"
+          }
+        }
+      },
+      "LogResponse": {
+        "type": "object",
+        "description": "Response body: the resolved service, the lines (oldest → newest), and\nwhether the underlying log file existed.",
+        "required": [
+          "service",
+          "lines",
+          "exists"
+        ],
+        "properties": {
+          "exists": {
+            "type": "boolean"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "service": {
+            "type": "string"
+          }
+        }
+      },
+      "Mention": {
+        "type": "object",
+        "required": [
+          "id",
+          "monitor_id",
+          "channel",
+          "external_id",
+          "content_text",
+          "content_url",
+          "ingested_at",
+          "platform_meta"
+        ],
+        "properties": {
+          "ai_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The judge's one-sentence explanation for the verdict."
+          },
+          "ai_verdict": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "AI filter verdict: `None` = no AI filtering applied, `pending` =\nawaiting judgment (hidden from the feed), `accepted` / `rejected`."
+          },
+          "author_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "author_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "channel": {
+            "type": "string"
+          },
+          "content_text": {
+            "type": "string"
+          },
+          "content_url": {
+            "type": "string"
+          },
+          "external_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "ingested_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "monitor_id": {
+            "type": "string"
+          },
+          "platform_meta": {},
+          "published_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "read_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "When the user marked this mention read; `None` = unread."
+          }
+        }
+      },
+      "MentionPage": {
+        "type": "object",
+        "description": "A page of mentions plus a cursor hint for keyset pagination.",
+        "required": [
+          "items",
+          "has_more"
+        ],
+        "properties": {
+          "has_more": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Mention"
+            }
+          }
+        }
+      },
+      "MentionSample": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "url"
+        ],
+        "properties": {
+          "author": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "repo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "Monitor": {
+        "type": "object",
+        "required": [
+          "id",
+          "workspace_id",
+          "terms",
+          "active",
+          "channels",
+          "exact_match",
+          "case_sensitive",
+          "exclude_terms",
+          "channel_settings",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "ai_filter_prompt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When set, this monitor's new mentions are held out of the feed until\nthe AI judge accepts them against this prompt."
+          },
+          "case_sensitive": {
+            "type": "boolean"
+          },
+          "channel_settings": {
+            "description": "Per-channel collection overrides, keyed by channel name (e.g.\n`{\"reddit\": {\"subreddits\": [\"accessibility\"]}}`). Shallow-merged over\nthe channel's global credentials at collection time; monitor keys win."
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "exact_match": {
+            "type": "boolean"
+          },
+          "exclude_terms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "terms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Match-any keyword/phrase list: a post matches this monitor if it contains\nANY of these terms (per `exact_match` / `case_sensitive`) and none of\n`exclude_terms`. Each term is a bare literal phrase — never OR/quotes."
+          },
+          "updated_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "workspace_id": {
+            "type": "string"
+          }
+        }
+      },
+      "Notification": {
+        "type": "object",
+        "description": "A per-workspace notification: a pure delivery endpoint. Every mention that\nenters the feed fans out to ALL notifications in its workspace — there is no\nmatching, criteria, per-monitor toggle, or frequency. `kind` selects the\ntransport and `config` is the kind-specific JSON:\n- `webpush`: `{ endpoint, p256dh, auth }` (the browser's subscription)\n- `webhook`: `{ url }`",
+        "required": [
+          "id",
+          "workspace_id",
+          "kind",
+          "config",
+          "created_at"
+        ],
+        "properties": {
+          "config": {},
+          "created_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspace_id": {
+            "type": "string"
+          }
+        }
+      },
+      "PendingCount": {
+        "type": "object",
+        "description": "Size and age of the AI-filter backlog for a workspace — how many mentions\nare still awaiting a verdict (withheld from the feed) and when the oldest was\ningested. The feed shows a \"N pending AI filter\" banner once the oldest has\naged past a staleness threshold.",
+        "required": [
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "oldest_ingested_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "`ingested_at` (epoch seconds) of the oldest pending mention, or `null`\nwhen nothing is pending."
+          }
+        }
+      },
+      "SetReadRequest": {
+        "type": "object",
+        "description": "Body for [`set_read`].",
+        "required": [
+          "read"
+        ],
+        "properties": {
+          "read": {
+            "type": "boolean",
+            "description": "`true` marks the mention read, `false` marks it unread."
+          }
+        }
+      },
+      "TargetHealth": {
+        "type": "string",
+        "description": "Coarse health of one collection target, derived purely from its sticky\nstatus fields. This is the *single source of truth* for both the per-target\nstatus badge (`GET /api/channels/{channel}/targets`) and the channel-level\ndegraded summary — both call [`target_health`] / [`summarize_targets`], so a\nbanner count can never drift from the table. It is time-independent: with\nthrottling governed globally by the rate limiter (no per-target backoff\nclock), a target's health depends only on its latest attempt outcome.",
+        "enum": [
+          "healthy",
+          "idle",
+          "throttled",
+          "failing"
+        ]
+      },
+      "TargetStatus": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/CollectorTarget"
+          },
+          {
+            "type": "object",
+            "required": [
+              "health",
+              "open_jobs"
+            ],
+            "properties": {
+              "health": {
+                "$ref": "#/components/schemas/TargetHealth",
+                "description": "Coarse health derived from the sticky status fields (the same classifier\nthe channel-level degraded banner counts), computed live at request time."
+              },
+              "open_jobs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/BackfillJob"
+                },
+                "description": "Open backfill jobs for this target (durable, survive restart)."
+              }
+            }
+          }
+        ],
+        "description": "Per-channel collection status: every durable target with its watermark and\nsticky failure status, plus a summary of its open backfill jobs."
+      },
+      "TargetsResponse": {
+        "type": "object",
+        "description": "The response for `GET /api/channels/{channel}/targets`.",
+        "required": [
+          "channel",
+          "targets",
+          "summary"
+        ],
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ChannelHealthSummary",
+            "description": "Per-health counts + a degraded banner message, computed from the same\nclassifier as each target's `health`, so the banner can't disagree with\nthe per-target list."
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TargetStatus"
+            }
+          },
+          "throttle": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ThrottleState",
+                "description": "Live state of the channel's shared rate-limiter lane, if one has been\nmaterialized yet. `None` before the first collection pass and for\nsimple-poller channels that don't pace through a lane."
+              }
+            ]
+          }
+        }
+      },
+      "TestNotificationResult": {
+        "type": "object",
+        "description": "Result of sending a test notification: how many of the workspace's\nnotifications it attempted to deliver to.",
+        "required": [
+          "delivered"
+        ],
+        "properties": {
+          "delivered": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ThrottleState": {
+        "type": "object",
+        "description": "A snapshot of a channel's live adaptive rate-limiter (the shared lane all of\nthe channel's targets pace through). Surfaced so the UI can watch the\ninterval converge as the limiter adapts.",
+        "required": [
+          "rate_per_min",
+          "interval_secs",
+          "paused"
+        ],
+        "properties": {
+          "interval_secs": {
+            "type": "number",
+            "format": "double",
+            "description": "The current minimum spacing between requests, in seconds."
+          },
+          "paused": {
+            "type": "boolean",
+            "description": "Whether issuance is currently gated to a future instant (a hard\n`Retry-After` pause, or simply the next paced slot)."
+          },
+          "rate_per_min": {
+            "type": "number",
+            "format": "double",
+            "description": "The current effective issuance rate, in requests per minute (`rate_per_sec * 60`)."
+          }
+        }
+      },
+      "UpdateMonitor": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "ai_filter_prompt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "AI relevance prompt; pass an empty string to clear."
+          },
+          "case_sensitive": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "channel_settings": {
+            "description": "Per-channel collection overrides; pass `{}` to clear."
+          },
+          "channels": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "exact_match": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "exclude_terms": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "terms": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Replace the match-any term list. Omit to leave it unchanged."
+          }
+        }
+      },
+      "VapidPublicKey": {
+        "type": "object",
+        "description": "The server's VAPID public key (base64url, uncompressed P-256 point) — the\nbrowser needs it as `applicationServerKey` when subscribing.",
+        "required": [
+          "key"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          }
+        }
+      },
+      "Workspace": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "WorkspaceBody": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "workspaces",
+      "description": "Workspace management"
+    },
+    {
+      "name": "monitors",
+      "description": "Monitor (watch) management"
+    },
+    {
+      "name": "mentions",
+      "description": "Ingested mentions feed"
+    },
+    {
+      "name": "notifications",
+      "description": "Per-workspace delivery endpoints (webpush/webhook)"
+    },
+    {
+      "name": "channels",
+      "description": "Channel configuration and maintenance"
+    },
+    {
+      "name": "push",
+      "description": "Web Push VAPID key (browser subscribe bootstrap)"
+    },
+    {
+      "name": "admin",
+      "description": "Operational / admin triggers"
+    },
+    {
+      "name": "config",
+      "description": "Runtime configuration (AI relevance filter)"
+    },
+    {
+      "name": "logs",
+      "description": "Per-service recent log output"
+    }
+  ]
+}

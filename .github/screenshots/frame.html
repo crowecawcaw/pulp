@@ -1,0 +1,100 @@
+<!doctype html>
+<!--
+  frame.html — REFERENCE ONLY.
+
+  The screenshot pipeline (capture.mjs) generates this exact chrome at runtime
+  and injects the captured app screenshot as a data-URI <img>. This standalone
+  file mirrors that markup/CSS with grey placeholders so you can preview or tweak
+  the frames without running Playwright. Open it directly in a browser.
+
+  Two frames are shown side by side:
+    .window  — desktop browser chrome (traffic-light dots + address bar)
+    .phone   — mobile phone skeleton (rounded body, bezel, notch)
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Pulp screenshot frames — reference</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start;
+    padding: 40px; background: #eceef1;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .placeholder {
+    display: flex; align-items: center; justify-content: center;
+    color: #9aa1ab; font-size: 14px; letter-spacing: .3px;
+    background: repeating-linear-gradient(45deg, #f4f5f7, #f4f5f7 12px, #eef0f3 12px, #eef0f3 24px);
+  }
+
+  /* ── Desktop browser-window chrome ─────────────────────────────────────── */
+  .window {
+    width: 720px;          /* half-scale preview; capture.mjs uses 1440 */
+    border-radius: 12px; overflow: hidden;
+    background: #f4f5f7; border: 1px solid #d7dae0;
+    box-shadow: 0 24px 60px -18px rgba(20,24,31,.45), 0 2px 6px rgba(20,24,31,.12);
+  }
+  .titlebar {
+    display: flex; align-items: center; gap: 12px;
+    height: 44px; padding: 0 14px;
+    background: linear-gradient(#fbfcfd, #eef0f3); border-bottom: 1px solid #dfe2e8;
+  }
+  .dots { display: flex; gap: 8px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+  .dot--r { background: #ff5f57; } .dot--y { background: #febc2e; } .dot--g { background: #28c840; }
+  .urlbar {
+    flex: 1 1 auto; display: flex; align-items: center; gap: 8px;
+    height: 28px; padding: 0 12px;
+    background: #fff; border: 1px solid #e0e3e9; border-radius: 7px;
+    color: #6b7280; font-size: 13px;
+  }
+  .lock { width: 12px; height: 12px; opacity: .6; }
+  .spacer { flex: 0 0 52px; }
+  .window .placeholder { width: 720px; height: 450px; }
+
+  /* ── Mobile phone skeleton ─────────────────────────────────────────────── */
+  .phone {
+    position: relative;
+    width: 414px; height: 868px;      /* 390 screen + 12 bezel each side */
+    background: linear-gradient(160deg, #23262c, #14161a);
+    border-radius: 52px; padding: 12px;
+    box-shadow: 0 0 0 2px #3a3e46, 0 28px 70px -20px rgba(10,12,16,.6), inset 0 0 3px rgba(255,255,255,.12);
+  }
+  .screen {
+    position: relative; width: 390px; height: 844px;
+    border-radius: 40px; overflow: hidden; background: #fff;
+  }
+  .notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 46%; height: 26px; background: #14161a;
+    border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; z-index: 2;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .speaker { width: 42px; height: 5px; border-radius: 3px; background: #33363d; }
+  .camera { width: 8px; height: 8px; border-radius: 50%; background: #2a2d33; box-shadow: inset 0 0 0 1px #3f434b; }
+  .phone .placeholder { width: 390px; height: 844px; }
+</style>
+</head>
+<body>
+  <div class="window">
+    <div class="titlebar">
+      <div class="dots"><span class="dot dot--r"></span><span class="dot dot--y"></span><span class="dot dot--g"></span></div>
+      <div class="urlbar">
+        <svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <span>pulp.local/feed</span>
+      </div>
+      <div class="spacer"></div>
+    </div>
+    <div class="placeholder">app screenshot goes here</div>
+  </div>
+
+  <div class="phone">
+    <div class="screen">
+      <div class="notch"><span class="speaker"></span><span class="camera"></span></div>
+      <div class="placeholder">app screenshot goes here</div>
+    </div>
+  </div>
+</body>
+</html>

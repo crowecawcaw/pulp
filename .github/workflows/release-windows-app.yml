@@ -1,0 +1,201 @@
+name: Release Windows app
+
+# Builds a signed Windows installer (pulp-<version>-x86_64.msi) and attaches it
+# to the GitHub Release for the tag.
+#
+# SEPARATE from cargo-dist's release.yml on purpose: cargo-dist ships the
+# CLI/agent path (.zip archive + PowerShell install script). This workflow owns
+# the ONLY MSI — cargo-dist's `msi` installer is intentionally NOT enabled, so
+# there is no unsigned duplicate. The MSI installs pulp.exe, adds it to PATH, and
+# creates a Start Menu shortcut that launches `pulp.exe app` (the tray launcher).
+#
+# Signing runs only when the certificate secret is present (see `preflight`).
+# Without it the job still builds an UNSIGNED .msi so tag pushes succeed before
+# a cert is configured — SmartScreen will warn on that one.
+#
+# Required secrets (documented in RELEASING.md):
+#   WINDOWS_CERTIFICATE           base64 of the Authenticode code-signing .pfx
+#   WINDOWS_CERTIFICATE_PASSWORD  password for that .pfx
+
+# DISABLED for now to conserve Actions minutes on the private repo — Windows
+# runners are billed at 2x. This builds only via manual dispatch. To re-enable
+# automatic signed .msi builds on release, restore the `push: tags` trigger.
+on:
+  workflow_dispatch:
+  # push:
+  #   tags:
+  #     - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  # WiX v3 (candle.exe / light.exe), the toolset cargo-wix drives by default.
+  WIX3_URL: https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip
+  # RFC 3161 timestamp authority for Authenticode signatures.
+  TIMESTAMP_URL: http://timestamp.digicert.com
+
+jobs:
+  windows-app:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- Frontend first: the web UI is embedded into pulp.exe at compile time
+      #     via rust-embed from backend/web-dist (built by Vite). ---
+      - name: Set up Node.js (to build the embedded web UI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend (populates backend/web-dist, embedded via rust-embed)
+        run: cd frontend && npm ci && npm run build
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install cargo-wix
+        run: cargo install cargo-wix --locked
+
+      - name: Install WiX Toolset v3
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = "$env:RUNNER_TEMP\wix3.zip"
+          $dir = "$env:RUNNER_TEMP\wix3"
+          Invoke-WebRequest -Uri $env:WIX3_URL -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          # candle.exe / light.exe must be on PATH for cargo-wix.
+          Add-Content -Path $env:GITHUB_PATH -Value $dir
+
+      - name: Derive version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          } else {
+            # workflow_dispatch: fall back to the crate version in Cargo.toml.
+            $line = Select-String -Path backend/Cargo.toml -Pattern '^version\s*=' | Select-Object -First 1
+            $version = ($line.Line -split '"')[1]
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Building Pulp version $version"
+
+      - name: Set crate version to the release tag
+        # cargo-wix reads the MSI ProductVersion from Cargo.toml; align it to the
+        # tag so the installer version matches the release. (CI checkout only —
+        # not committed.)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = "${{ steps.version.outputs.version }}"
+          $path = 'backend/Cargo.toml'
+          $content = Get-Content $path -Raw
+          $content = $content -replace '(?m)^version\s*=\s*"[^"]*"', "version = `"$version`""
+          Set-Content -Path $path -Value $content -NoNewline
+          Select-String -Path $path -Pattern '^version' | Select-Object -First 1
+
+      # --- Build the tray-enabled exe FIRST. cargo-wix cannot forward a
+      #     --features flag to its own build, so we build here and have the wxs
+      #     harvest this prebuilt exe (cargo wix --no-build --target-bin-dir). ---
+      - name: Build pulp.exe (--features tray)
+        run: cd backend && cargo build --release --features tray --target x86_64-pc-windows-msvc
+
+      - name: Signing preflight
+        id: preflight
+        shell: pwsh
+        env:
+          CERT: ${{ secrets.WINDOWS_CERTIFICATE }}
+        run: |
+          if ([string]::IsNullOrEmpty($env:CERT)) {
+            "sign=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            Write-Host "::warning::WINDOWS_CERTIFICATE not set — producing an UNSIGNED .msi (SmartScreen will warn)."
+          } else {
+            "sign=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+
+      - name: Locate signtool
+        if: steps.preflight.outputs.sign == 'true'
+        id: signtool
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Newest Windows SDK signtool for x64.
+          $tool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $tool) { throw "signtool.exe not found" }
+          "path=$($tool.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "signtool: $($tool.FullName)"
+
+      - name: Import code-signing certificate
+        if: steps.preflight.outputs.sign == 'true'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pfx = "$env:RUNNER_TEMP\codesign.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          "PFX_PATH=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Sign pulp.exe (before packaging)
+        if: steps.preflight.outputs.sign == 'true'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = "backend\target\x86_64-pc-windows-msvc\release\pulp.exe"
+          & "${{ steps.signtool.outputs.path }}" sign `
+            /f $env:PFX_PATH /p $env:WINDOWS_CERTIFICATE_PASSWORD `
+            /fd SHA256 /tr $env:TIMESTAMP_URL /td SHA256 $exe
+          & "${{ steps.signtool.outputs.path }}" verify /pa $exe
+
+      # --- Package the MSI from the prebuilt (and, if enabled, already-signed)
+      #     exe. --no-build skips cargo build; --target-bin-dir sets
+      #     $(var.CargoTargetBinDir) that backend/wix/main.wxs harvests from. ---
+      - name: Build MSI with cargo-wix
+        id: wix
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = "${{ steps.version.outputs.version }}"
+          $out = "target\wix\pulp-$version-x86_64.msi"
+          Push-Location backend
+          cargo wix `
+            --no-build `
+            --nocapture `
+            --target x86_64-pc-windows-msvc `
+            --target-bin-dir "target\x86_64-pc-windows-msvc\release" `
+            --output $out
+          Pop-Location
+          $full = "backend\$out"
+          if (-not (Test-Path $full)) { throw "MSI not produced at $full" }
+          "path=$full" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "MSI: $full"
+
+      - name: Sign the .msi
+        if: steps.preflight.outputs.sign == 'true'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $msi = "${{ steps.wix.outputs.path }}"
+          & "${{ steps.signtool.outputs.path }}" sign `
+            /f $env:PFX_PATH /p $env:WINDOWS_CERTIFICATE_PASSWORD `
+            /fd SHA256 /tr $env:TIMESTAMP_URL /td SHA256 $msi
+          & "${{ steps.signtool.outputs.path }}" verify /pa $msi
+
+      - name: Upload .msi to the GitHub Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.wix.outputs.path }}
+          fail_on_unmatched_files: true

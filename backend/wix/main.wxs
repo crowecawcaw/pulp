@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<!--
+  WiX v3 source for the signed Pulp Windows installer (.msi), built by
+  cargo-wix in .github/workflows/release-windows-app.yml.
+
+  It installs pulp.exe, adds the install dir to the system PATH, and creates a
+  Start Menu shortcut "Pulp" that launches `pulp.exe app` (the system-tray
+  launcher) using pulp.ico as its icon.
+
+  cargo-wix variables used below:
+    $(var.Version)          package version (from Cargo.toml; the workflow bumps
+                            it to the release tag before packaging)
+    $(var.Platform)         build target arch (x64 here)
+    $(var.CargoTargetBinDir) directory the compiled pulp.exe is harvested from.
+                            The workflow builds the exe with the "tray" feature
+                            FIRST (cargo build with the tray feature), then runs
+                            cargo-wix in no-build / harvest mode pointed at that
+                            dir, so this MSI packages the tray-enabled binary.
+                            cargo-wix cannot forward a features flag to its own
+                            build, hence the build-then-harvest split.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <?if $(var.Platform) = x64 ?>
+        <?define ProgramFilesFolder = "ProgramFiles64Folder" ?>
+    <?else ?>
+        <?define ProgramFilesFolder = "ProgramFilesFolder" ?>
+    <?endif ?>
+
+    <Product
+        Id="*"
+        Name="Pulp"
+        UpgradeCode="6F3A2C1E-9B4D-4E7A-8F2B-1D5C7A9E0B34"
+        Manufacturer="Nimbus Labs"
+        Language="1033"
+        Codepage="1252"
+        Version="$(var.Version)">
+
+        <Package
+            Id="*"
+            Keywords="Installer"
+            Description="Pulp — self-hostable social listening"
+            Manufacturer="Nimbus Labs"
+            InstallerVersion="450"
+            Languages="1033"
+            Compressed="yes"
+            InstallScope="perMachine"
+            SummaryCodepage="1252" />
+
+        <MajorUpgrade
+            Schedule="afterInstallInitialize"
+            DowngradeErrorMessage="A newer version of Pulp is already installed. Setup will now exit." />
+
+        <Media Id="1" Cabinet="media1.cab" EmbedCab="yes" DiskPrompt="CD-ROM #1" />
+        <Property Id="DiskPrompt" Value="Pulp Installation" />
+
+        <!-- Icon used by Add/Remove Programs and the Start Menu shortcut. -->
+        <Icon Id="ProductICO" SourceFile="wix\pulp.ico" />
+        <Property Id="ARPPRODUCTICON" Value="ProductICO" />
+        <Property Id="ARPHELPLINK" Value="https://github.com/crowecawcaw/pulp" />
+
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="$(var.ProgramFilesFolder)">
+                <Directory Id="APPLICATIONFOLDER" Name="Pulp">
+                    <!-- pulp.exe (harvested from CargoTargetBinDir). -->
+                    <Component Id="binary0" Guid="A1B2C3D4-1111-4A2B-9C3D-0E1F2A3B4C5D">
+                        <File
+                            Id="exe0"
+                            Name="pulp.exe"
+                            DiskId="1"
+                            Source="$(var.CargoTargetBinDir)\pulp.exe"
+                            KeyPath="yes" />
+                    </Component>
+
+                    <!-- Add the install dir to the system PATH. -->
+                    <Component Id="Path" Guid="B2C3D4E5-2222-4B3C-8D4E-1F2A3B4C5D6E" KeyPath="yes">
+                        <Environment
+                            Id="PATH"
+                            Name="PATH"
+                            Value="[APPLICATIONFOLDER]"
+                            Permanent="no"
+                            Part="last"
+                            Action="set"
+                            System="yes" />
+                    </Component>
+                </Directory>
+            </Directory>
+
+            <!-- Start Menu shortcut → `pulp.exe app` (the tray launcher). -->
+            <Directory Id="ProgramMenuFolder">
+                <Directory Id="ApplicationProgramsFolder" Name="Pulp" />
+            </Directory>
+        </Directory>
+
+        <DirectoryRef Id="ApplicationProgramsFolder">
+            <Component Id="StartMenuShortcut" Guid="C3D4E5F6-3333-4C4D-9E5F-2A3B4C5D6E7F">
+                <Shortcut
+                    Id="PulpStartMenuShortcut"
+                    Name="Pulp"
+                    Description="Start the Pulp menu-bar / system-tray launcher"
+                    Target="[APPLICATIONFOLDER]pulp.exe"
+                    Arguments="app"
+                    Icon="ProductICO"
+                    WorkingDirectory="APPLICATIONFOLDER" />
+                <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+                <RegistryValue
+                    Root="HKCU"
+                    Key="Software\NimbusLabs\Pulp"
+                    Name="installed"
+                    Type="integer"
+                    Value="1"
+                    KeyPath="yes" />
+            </Component>
+        </DirectoryRef>
+
+        <Feature
+            Id="Complete"
+            Title="Pulp"
+            Description="The Pulp application, PATH entry, and Start Menu shortcut."
+            Level="1"
+            ConfigurableDirectory="APPLICATIONFOLDER"
+            Display="expand"
+            AllowAdvertise="no"
+            Absent="disallow">
+            <ComponentRef Id="binary0" />
+            <ComponentRef Id="Path" />
+            <ComponentRef Id="StartMenuShortcut" />
+        </Feature>
+
+        <!-- Let the user pick the install directory (WixUI_InstallDir). -->
+        <Property Id="WIXUI_INSTALLDIR" Value="APPLICATIONFOLDER" />
+        <UIRef Id="WixUI_InstallDir" />
+        <UIRef Id="WixUI_ErrorProgressText" />
+    </Product>
+</Wix>

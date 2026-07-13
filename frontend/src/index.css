@@ -1,0 +1,76 @@
+@import './theme.css';
+
+/* Self-hosted display/body typefaces (formerly loaded at runtime from
+   fonts.googleapis.com). Vendored as local woff2 files under
+   src/assets/fonts/ so the app has no external font dependency and an
+   installed PWA keeps its fonts offline — vite-plugin-pwa's globPatterns
+   already includes `woff2`, so the built, hashed files are precached
+   automatically. Only the weights/styles actually used by theme.css /
+   this file are vendored (Baloo 2 800; Nunito's normal weights 400-900
+   via its variable font; Nunito italic 600), and only the Latin subset
+   (the app's fixtures and UI copy are English-only). */
+@font-face {
+  font-family: 'Baloo 2';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('./assets/fonts/baloo2-800.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('./assets/fonts/nunito-variable.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: italic;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./assets/fonts/nunito-italic-600.woff2') format('woff2');
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Tailwind color system — mapped to the grapefruit palette */
+    --background:             0   0% 100%;
+    --foreground:           288  16% 16%;   /* warm slate #2b2230 */
+    --card:                   0   0% 100%;
+    --card-foreground:      288  16% 16%;
+    --primary:              346  86% 65%;   /* grapefruit pink #F4587C */
+    --primary-foreground:     0   0% 100%;
+    --secondary:            340  40% 96%;
+    --secondary-foreground: 288  16% 16%;
+    --muted:                340  40% 96%;
+    --muted-foreground:     300  10% 45%;
+    --accent:               346 100% 96%;   /* light pink hover */
+    --accent-foreground:    288  16% 16%;
+    --destructive:            0  69% 50%;
+    --destructive-foreground: 0   0% 100%;
+    --border:               340  25% 90%;   /* light warm border */
+    --input:                340  25% 90%;
+    --ring:                 346  86% 65%;
+    --radius:               0.5rem;
+    --popover:                0   0% 100%;
+    --popover-foreground:   288  16% 16%;
+  }
+
+  html, body {
+    /* App-like: no page-level rubber-band / pull-to-refresh on the skeleton */
+    overscroll-behavior: none;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Nunito', sans-serif;
+    margin: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #root { min-height: 100dvh; }
+}
