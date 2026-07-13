@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/pulp/pr-1/sw.js', { scope: '/pulp/pr-1/' })})}
