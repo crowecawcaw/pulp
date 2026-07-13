@@ -1,0 +1,79 @@
+name: Cut release
+
+# Manually cut a release from the GitHub UI (Actions → "Cut release" → Run
+# workflow). This creates and pushes the `vX.Y.Z` tag, which in turn triggers
+# the cargo-dist release workflow (release.yml) to build the binary + installer
+# and publish them to a GitHub Release.
+#
+# WHY A PAT IS REQUIRED: a tag pushed with the default GITHUB_TOKEN does NOT
+# start any downstream workflow runs (GitHub's recursion guard — the same one
+# documented in screenshots.yml). So release.yml would never fire. Pushing the
+# tag with a Personal Access Token works around that.
+#
+# ONE-TIME SETUP: create a fine-grained PAT scoped to this repo with
+# "Contents: Read and write", then add it as an Actions secret named
+# RELEASE_PAT (Settings → Secrets and variables → Actions → New repository
+# secret). Without it this workflow fails fast with an explanatory error.
+#
+# The tagged version must equal backend/Cargo.toml's version — cargo-dist
+# refuses to release otherwise — so this workflow bumps nothing and validates
+# the match before tagging. Bump the crate version in a normal PR first.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 1.2.3 (blank = use backend/Cargo.toml)."
+        required: false
+        type: string
+
+# GITHUB_TOKEN needs nothing beyond reading the repo to check out — the tag is
+# pushed with RELEASE_PAT, not GITHUB_TOKEN.
+permissions: {}
+
+jobs:
+  cut:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need tags to check for an existing release tag
+
+      - name: Create and push the release tag
+        env:
+          VERSION_INPUT: ${{ inputs.version }}
+          RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${RELEASE_PAT:-}" ]; then
+            echo "::error::RELEASE_PAT secret is not set. Add a PAT with 'Contents: write' so the tag push can trigger release.yml. See this workflow's header for setup."
+            exit 1
+          fi
+
+          cargo_version="$(grep -m1 '^version' backend/Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')"
+          requested="${VERSION_INPUT#v}"        # tolerate a leading 'v'
+          version="${requested:-$cargo_version}"
+
+          if [ "$version" != "$cargo_version" ]; then
+            echo "::error::Requested '$version' but backend/Cargo.toml is '$cargo_version'. cargo-dist requires them to match — bump the crate version in a PR first."
+            exit 1
+          fi
+
+          tag="v$version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "::error::Tag $tag already exists. Delete it first, or bump the version."
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "Release $tag"
+          git push "https://x-access-token:${RELEASE_PAT}@github.com/${REPO}.git" "$tag"
+
+          echo "### Cut release $tag :rocket:" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Pushed tag \`$tag\` — the [release workflow](../../actions/workflows/release.yml) will build and publish the GitHub Release." >> "$GITHUB_STEP_SUMMARY"
