@@ -54,7 +54,9 @@ fn launched_from_app_bundle() -> bool {
     }
     let exe = std::env::current_exe().ok();
     let exe = exe.as_deref().map(|p| p.to_string_lossy());
-    let args = std::env::args_os().skip(1).map(|a| a.to_string_lossy().into_owned());
+    let args = std::env::args_os()
+        .skip(1)
+        .map(|a| a.to_string_lossy().into_owned());
     is_bundle_launch(exe.as_deref(), args)
 }
 
@@ -96,7 +98,10 @@ mod tests {
     #[test]
     fn bundle_with_real_subcommand_is_normal_cli() {
         assert!(!is_bundle_launch(Some(IN_BUNDLE), args(&["serve"])));
-        assert!(!is_bundle_launch(Some(IN_BUNDLE), args(&["-psn_0_1", "serve"])));
+        assert!(!is_bundle_launch(
+            Some(IN_BUNDLE),
+            args(&["-psn_0_1", "serve"])
+        ));
     }
 
     #[test]

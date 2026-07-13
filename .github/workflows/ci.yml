@@ -126,3 +126,24 @@ jobs:
 
       - name: Check for API drift
         run: git diff --exit-code backend/openapi.json frontend/src/api/types.gen.ts
+
+  # Static analysis of the workflow files themselves (supply-chain / injection /
+  # permissions hardening). Policy lives in .github/zizmor.yml, which zizmor
+  # auto-discovers. The gate fails the build on any *high*-severity finding;
+  # lower severities are advisory and don't block.
+  zizmor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Audit workflows (fail on any high-severity finding)
+        uses: zizmorcore/zizmor-action@v0.5.7
+        with:
+          inputs: .github/workflows/
+          config: .github/zizmor.yml
+          min-severity: high
+          # This repo has no GitHub Advanced Security, so don't try to upload
+          # SARIF to the security tab — print findings to the log and let a
+          # high-severity finding fail the job (the action propagates zizmor's
+          # exit code).
+          advanced-security: false
