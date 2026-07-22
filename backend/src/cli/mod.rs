@@ -210,11 +210,44 @@ pub fn server_log_path() -> anyhow::Result<std::path::PathBuf> {
     Ok(crate::config::resolve_home()?.join("server.log"))
 }
 
+/// Given a raw argv (including argv[0]), return the argv the windowless desktop
+/// launcher (`pulpw.exe`) should parse: if there is no subcommand token — a bare
+/// `pulpw`, or flags only like `pulpw --no-autostart` — insert `app` so the
+/// launch starts the tray. An explicit subcommand (`pulpw app …`, the login
+/// item's `pulpw app`, even `pulpw serve`) passes through unchanged.
+///
+/// `pulpw` is a `windows`-subsystem process with no console, so a clap usage
+/// error from a bare flag would be invisible; defaulting to `app` here keeps
+/// every reasonable launch working. Lives in the library (not the `pulpw` bin)
+/// so it is exercised by the default `cargo test`, which doesn't build the bin.
+pub fn imply_app_subcommand(raw: &[std::ffi::OsString]) -> Vec<std::ffi::OsString> {
+    let has_subcommand = raw
+        .iter()
+        .skip(1)
+        .any(|a| !a.to_string_lossy().starts_with('-'));
+    if has_subcommand {
+        return raw.to_vec();
+    }
+    let mut args = Vec::with_capacity(raw.len() + 1);
+    args.push(
+        raw.first()
+            .cloned()
+            .unwrap_or_else(|| std::ffi::OsString::from("pulpw")),
+    );
+    args.push(std::ffi::OsString::from("app"));
+    args.extend(raw.iter().skip(1).cloned());
+    args
+}
+
 /// Set up `serve` logging: human format to stdout (ANSI) plus the same stream
 /// ANSI-free appended to [`server_log_path`], so logs survive however the
 /// process was launched. Falls back to stdout-only if the file can't be
 /// opened. Default level is `info` when `RUST_LOG` is unset.
-fn init_serve_logging() {
+///
+/// `pub(crate)` so the desktop tray launcher (`app::run_blocking`) can call it:
+/// `pulpw.exe` runs as a windowless GUI process with no console, so without this
+/// the server's logs would go nowhere and "Open logs folder" would be empty.
+pub(crate) fn init_serve_logging() {
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
 
@@ -356,6 +389,49 @@ mod tests {
     #[test]
     fn clap_definition_is_valid() {
         Cli::command().debug_assert();
+    }
+
+    fn os(v: &[&str]) -> Vec<std::ffi::OsString> {
+        v.iter().map(std::ffi::OsString::from).collect()
+    }
+
+    #[test]
+    fn pulpw_bare_launch_implies_app() {
+        // Start Menu shortcut / double-click / login item with no args.
+        assert_eq!(imply_app_subcommand(&os(&["pulpw"])), os(&["pulpw", "app"]));
+    }
+
+    #[test]
+    fn pulpw_flags_only_launch_implies_app_before_the_flags() {
+        // A windowless GUI can't show a clap error, so `pulpw --no-autostart`
+        // must become `pulpw app --no-autostart`, not fail.
+        assert_eq!(
+            imply_app_subcommand(&os(&["pulpw", "--no-autostart"])),
+            os(&["pulpw", "app", "--no-autostart"])
+        );
+    }
+
+    #[test]
+    fn pulpw_explicit_subcommand_passes_through() {
+        // Login item registers `pulpw app`; must not become `app app`.
+        for argv in [
+            os(&["pulpw", "app"]),
+            os(&["pulpw", "app", "--no-autostart"]),
+            os(&["pulpw", "serve"]),
+        ] {
+            assert_eq!(imply_app_subcommand(&argv), argv);
+        }
+    }
+
+    #[test]
+    fn pulpw_implied_args_parse_to_the_app_command() {
+        // End-to-end: the implied argv actually parses as `App`.
+        let argv = imply_app_subcommand(&os(&["pulpw", "--no-autostart"]));
+        let cli = Cli::try_parse_from(argv).unwrap();
+        match cli.command {
+            Command::App(args) => assert!(args.no_autostart),
+            other => panic!("expected App, got {:?}", other),
+        }
     }
 
     #[test]

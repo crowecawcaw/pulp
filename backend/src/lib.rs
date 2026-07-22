@@ -7,6 +7,7 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod notifier;
+pub mod proc;
 pub mod ratelimit;
 pub mod server;
 pub mod state;

@@ -15,4 +15,33 @@ fn main() {
     // causing "migration N previously applied but missing"). Watching the dir
     // here invalidates the build so a new migration is re-embedded.
     println!("cargo:rerun-if-changed=migrations");
+
+    embed_windows_resources();
 }
+
+/// On Windows, embed the app icon + version metadata into the built `.exe`s so
+/// pulp.exe/pulpw.exe show the Pulp icon in Explorer, the taskbar, and Alt-Tab
+/// and read as a real installed app in file properties. This applies to every
+/// binary target in the crate (both `pulp` and `pulpw`). No-op off Windows.
+#[cfg(windows)]
+fn embed_windows_resources() {
+    // wix/pulp.ico is the same icon the MSI uses for the Start Menu shortcut and
+    // Add/Remove Programs — reuse it so the exe, shortcut, and ARP all match.
+    let icon = "wix/pulp.ico";
+    println!("cargo:rerun-if-changed={icon}");
+
+    let mut res = winresource::WindowsResource::new();
+    res.set_icon(icon)
+        .set("ProductName", "Pulp")
+        .set("FileDescription", "Pulp — self-hostable social listening")
+        .set("CompanyName", "Nimbus Labs")
+        .set("LegalCopyright", "MIT-licensed");
+    if let Err(e) = res.compile() {
+        // The icon/metadata are cosmetic — a missing or broken resource compiler
+        // must not fail the whole build (which also produces the working exe).
+        println!("cargo:warning=winresource: could not embed Windows icon/metadata: {e}");
+    }
+}
+
+#[cfg(not(windows))]
+fn embed_windows_resources() {}

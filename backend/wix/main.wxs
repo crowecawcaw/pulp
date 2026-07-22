@@ -3,9 +3,10 @@
   WiX v3 source for the signed Pulp Windows installer (.msi), built by
   cargo-wix in .github/workflows/release-windows-app.yml.
 
-  It installs pulp.exe, adds the install dir to the system PATH, and creates a
-  Start Menu shortcut "Pulp" that launches `pulp.exe app` (the system-tray
-  launcher) using pulp.ico as its icon.
+  It installs BOTH binaries - pulp.exe (the console CLI) and pulpw.exe (the
+  windowless desktop app, like python.exe/pythonw.exe) - adds the install dir to
+  the system PATH, and creates a Start Menu shortcut "Pulp" that launches
+  pulpw.exe (the system-tray launcher, no console window) using pulp.ico.
 
   cargo-wix variables used below:
     $(var.Version)          package version (from Cargo.toml; the workflow bumps
@@ -61,13 +62,25 @@
         <Directory Id="TARGETDIR" Name="SourceDir">
             <Directory Id="$(var.ProgramFilesFolder)">
                 <Directory Id="APPLICATIONFOLDER" Name="Pulp">
-                    <!-- pulp.exe (harvested from CargoTargetBinDir). -->
+                    <!-- pulp.exe - the console CLI (harvested from CargoTargetBinDir). -->
                     <Component Id="binary0" Guid="A1B2C3D4-1111-4A2B-9C3D-0E1F2A3B4C5D">
                         <File
                             Id="exe0"
                             Name="pulp.exe"
                             DiskId="1"
                             Source="$(var.CargoTargetBinDir)\pulp.exe"
+                            KeyPath="yes" />
+                    </Component>
+
+                    <!-- pulpw.exe - the windowless desktop app (the Start Menu
+                         shortcut and run-at-login item launch this one). Built
+                         alongside pulp.exe by the tray-feature release build. -->
+                    <Component Id="binary1" Guid="D4E5F6A7-4444-4D5E-AF60-3B4C5D6E7F80">
+                        <File
+                            Id="exe1"
+                            Name="pulpw.exe"
+                            DiskId="1"
+                            Source="$(var.CargoTargetBinDir)\pulpw.exe"
                             KeyPath="yes" />
                     </Component>
 
@@ -85,7 +98,7 @@
                 </Directory>
             </Directory>
 
-            <!-- Start Menu shortcut → `pulp.exe app` (the tray launcher). -->
+            <!-- Start Menu shortcut -> pulpw.exe (the windowless tray launcher). -->
             <Directory Id="ProgramMenuFolder">
                 <Directory Id="ApplicationProgramsFolder" Name="Pulp" />
             </Directory>
@@ -96,9 +109,8 @@
                 <Shortcut
                     Id="PulpStartMenuShortcut"
                     Name="Pulp"
-                    Description="Start the Pulp menu-bar / system-tray launcher"
-                    Target="[APPLICATIONFOLDER]pulp.exe"
-                    Arguments="app"
+                    Description="Start the Pulp system-tray app"
+                    Target="[APPLICATIONFOLDER]pulpw.exe"
                     Icon="ProductICO"
                     WorkingDirectory="APPLICATIONFOLDER" />
                 <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
@@ -122,9 +134,15 @@
             AllowAdvertise="no"
             Absent="disallow">
             <ComponentRef Id="binary0" />
+            <ComponentRef Id="binary1" />
             <ComponentRef Id="Path" />
             <ComponentRef Id="StartMenuShortcut" />
         </Feature>
+
+        <!-- Show Pulp's actual MIT license on the installer's license page,
+             overriding the Lorem-ipsum placeholder WixUIExtension ships as the
+             default WixUILicenseRtf. -->
+        <WixVariable Id="WixUILicenseRtf" Value="wix\License.rtf" />
 
         <!-- Let the user pick the install directory (WixUI_InstallDir). -->
         <Property Id="WIXUI_INSTALLDIR" Value="APPLICATIONFOLDER" />

@@ -35,3 +35,8 @@ rules:
       - release.yml
       - release-macos-app.yml
       - release-windows-app.yml
+      # ci-windows-installer.yml uploads an unsigned .msi artifact and so trips
+      # the same setup-node heuristic. It has npm caching disabled and is
+      # read-only (permissions: contents: read), so there is no privileged cache
+      # to poison. Same accepted risk as the other artifact workflows.
+      - ci-windows-installer.yml

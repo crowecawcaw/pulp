@@ -43,6 +43,13 @@ pub struct AppArgs {
     /// the `app` name.
     #[arg(long)]
     pub no_tray: bool,
+
+    /// Start straight to the tray without opening the web UI. This is what the
+    /// run-at-login item passes, so a login/boot launch stays quietly in the
+    /// tray; a manual launch (Start Menu / double-click) opens the UI so the
+    /// user sees the app come up.
+    #[arg(long)]
+    pub minimized: bool,
 }
 
 pub const LONG_ABOUT: &str = "\
@@ -61,6 +68,8 @@ choose Quit from the tray, which stops the server and exits.
 FLAGS:
   --no-autostart   don't enable run-at-login (enabled by default on first run)
   --no-tray        run headless in the foreground with no tray icon
+  --minimized      start to the tray without opening the web UI (the login item
+                   passes this; a manual launch opens the UI)
 
 Tray support is compiled in only when the binary is built with
 `--features tray` (it needs GTK3 + libayatana-appindicator on Linux). A build
@@ -101,12 +110,13 @@ mod imp {
     // `tray-icon` re-exports its matching `muda` as `tray_icon::menu`, so we do
     // not depend on `muda` directly (keeps the versions in lockstep).
     use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
-    use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
+    use tray_icon::{Icon, MouseButton, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
     /// User events forwarded from tray-icon's global channels onto the tao
     /// event loop (which owns the main thread).
     enum UserEvent {
         Menu(MenuEvent),
+        Tray(TrayIconEvent),
     }
 
     /// Everything the running tray owns. Kept alive for the whole session (the
@@ -131,6 +141,12 @@ mod imp {
     /// here. Never returns — the event loop diverges and exits the process on
     /// Quit.
     pub fn run_blocking(args: AppArgs) -> anyhow::Result<()> {
+        // Route logging to `<home>/server.log` before anything starts. The tray
+        // launcher (especially `pulpw.exe`, a windowless GUI process) has no
+        // console, so without this the server's tracing output would be dropped
+        // and the tray's "Open logs folder" would show nothing.
+        crate::cli::init_serve_logging();
+
         // Resolve the URLs once, up front, off the GUI event loop. `install_url`
         // shells out to `tailscale` (blocking, with a cert side effect), which
         // must never run on the event-loop thread — doing it here, before the
@@ -166,6 +182,30 @@ mod imp {
             })
             .context("spawning server thread")?;
 
+        // --- Launch feedback -------------------------------------------------
+        // On a manual launch (Start Menu / double-click), open the web UI once
+        // the server is accepting connections, so the user gets a visible window
+        // (their browser) rather than a silent tray icon. `--minimized` — which
+        // the run-at-login item passes — skips this so a boot/login launch stays
+        // quietly in the tray.
+        if !args.minimized {
+            let url = open_url.clone();
+            std::thread::spawn(move || {
+                let target = url.trim_start_matches("http://").to_string();
+                // Wait up to ~10s for the listener so the browser doesn't race
+                // the bind and show a connection error; then open regardless.
+                for _ in 0..100 {
+                    if std::net::TcpStream::connect(&target).is_ok() {
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+                if let Err(e) = open::that_detached(&url) {
+                    tracing::warn!("could not open the web UI at {url}: {e}");
+                }
+            });
+        }
+
         // --- GUI event loop (owns the main thread) ---------------------------
         let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
 
@@ -174,6 +214,13 @@ mod imp {
         let proxy = event_loop.create_proxy();
         MenuEvent::set_event_handler(Some(move |event| {
             let _ = proxy.send_event(UserEvent::Menu(event));
+        }));
+
+        // Also forward tray-icon click events, so a double-click on the tray
+        // icon re-opens the UI (right-click still opens the context menu).
+        let tray_proxy = event_loop.create_proxy();
+        TrayIconEvent::set_event_handler(Some(move |event| {
+            let _ = tray_proxy.send_event(UserEvent::Tray(event));
         }));
 
         let mut app_tray: Option<AppTray> = None;
@@ -200,6 +247,22 @@ mod imp {
                                 let _ = h.join();
                             }
                             *control_flow = ControlFlow::Exit;
+                        }
+                    }
+                }
+                Event::UserEvent(UserEvent::Tray(tray_event)) => {
+                    // Double-click the tray icon (left button) → open the web UI,
+                    // the same as the "Open Pulp" menu item. Right-click already
+                    // opens the context menu, so we don't act on it here.
+                    if let TrayIconEvent::DoubleClick {
+                        button: MouseButton::Left,
+                        ..
+                    } = tray_event
+                    {
+                        if let Some(tray) = app_tray.as_ref() {
+                            if let Err(e) = open::that_detached(&tray.open_url) {
+                                eprintln!("could not open {}: {e}", tray.open_url);
+                            }
                         }
                     }
                 }
@@ -318,7 +381,9 @@ mod imp {
         builder
             .set_app_name("Pulp")
             .set_app_path(&app_path)
-            .set_args(&["app"]);
+            // `--minimized` so a login/boot launch starts quietly in the tray
+            // without opening the browser (a manual launch has no flag and does).
+            .set_args(&["app", "--minimized"]);
         #[cfg(target_os = "macos")]
         builder.set_use_launch_agent(true);
         builder.build().context("configuring start-at-login")
