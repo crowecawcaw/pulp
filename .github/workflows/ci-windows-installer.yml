@@ -1,0 +1,98 @@
+name: Windows installer (PR)
+
+# Builds an UNSIGNED Windows installer (.msi) on pull requests and uploads it as
+# a workflow artifact, so installer-affecting changes (the two-binary build,
+# wix/main.wxs, the embedded .exe icon, the tray feature) can be downloaded and
+# smoke-tested before release.
+#
+# Deliberately SEPARATE from release-windows-app.yml: that workflow owns the
+# SIGNED release .msi, needs `contents: write` + signing secrets, and is
+# maintainer-triggered (tag / workflow_dispatch). This one is read-only, runs on
+# untrusted PR code, holds no secrets, and never publishes a Release — so it
+# stays least-privilege. The .msi it produces is unsigned (SmartScreen will warn
+# on it); that's fine for testing.
+#
+# pulp is a public repo, so GitHub-hosted Windows runners are free. Path-filtered
+# so it only runs when something that lands in the installer actually changes.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/ci-windows-installer.yml'
+  workflow_dispatch:
+
+# Least privilege: only read the repo. Artifact upload uses the Actions runtime,
+# not a GITHUB_TOKEN write scope.
+permissions:
+  contents: read
+
+env:
+  # WiX v3 (candle.exe / light.exe), the toolset cargo-wix drives by default.
+  WIX3_URL: https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- Frontend first: the web UI is embedded into pulp.exe at compile time
+      #     via rust-embed from backend/web-dist (built by Vite). ---
+      - name: Set up Node.js (to build the embedded web UI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          # No npm cache on purpose: this job uploads a downloadable artifact, so
+          # a restored cache is a supply-chain (cache-poisoning) vector on PR code.
+
+      - name: Build frontend (populates backend/web-dist, embedded via rust-embed)
+        run: cd frontend && npm ci && npm run build
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install cargo-wix
+        run: cargo install cargo-wix --locked
+
+      - name: Install WiX Toolset v3
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = "$env:RUNNER_TEMP\wix3.zip"
+          $dir = "$env:RUNNER_TEMP\wix3"
+          Invoke-WebRequest -Uri $env:WIX3_URL -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          # candle.exe / light.exe must be on PATH for cargo-wix.
+          Add-Content -Path $env:GITHUB_PATH -Value $dir
+
+      # --- Build BOTH binaries: pulp.exe (console CLI) and pulpw.exe (windowless
+      #     desktop app). pulpw has `required-features = ["tray"]`, so enabling
+      #     the tray feature is what pulls it into the build. cargo-wix cannot
+      #     forward a --features flag to its own build, so we build here and have
+      #     the wxs harvest these prebuilt exes (cargo wix --no-build). ---
+      - name: Build pulp.exe + pulpw.exe (--features tray)
+        run: cd backend && cargo build --release --features tray --target x86_64-pc-windows-msvc
+
+      # --- Package the (unsigned) MSI from the prebuilt exes. --no-build skips
+      #     cargo build; --target-bin-dir sets $(var.CargoTargetBinDir) that
+      #     backend/wix/main.wxs harvests pulp.exe + pulpw.exe from. cargo-wix
+      #     names the output pulp-<version>-x86_64.msi under target/wix/. ---
+      - name: Build MSI with cargo-wix (unsigned)
+        run: >
+          cd backend && cargo wix
+          --no-build
+          --nocapture
+          --target x86_64-pc-windows-msvc
+          --target-bin-dir "target/x86_64-pc-windows-msvc/release"
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pulp-installer-msi
+          path: backend/target/wix/*.msi
+          if-no-files-found: error
