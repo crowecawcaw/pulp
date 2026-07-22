@@ -250,11 +250,24 @@ fn start(home: &Path, addr: &str, json: bool, out: &mut dyn Write) -> anyhow::Re
 
     let exe = std::env::current_exe().context("locating the pulp executable")?;
     let log = open_log(home)?;
-    let child = Command::new(&exe)
+    let mut command = Command::new(&exe);
+    command
         .arg("serve")
         .stdin(Stdio::null())
         .stdout(log.try_clone().context("duplicating log handle")?)
-        .stderr(log)
+        .stderr(log);
+    // On Windows, spawn the background server with no console window. `pulp.exe`
+    // is a console-subsystem app, so without CREATE_NO_WINDOW a `serve start`
+    // launched from a GUI context (the tray, Explorer, a shortcut) pops a stray
+    // console; from a terminal it would otherwise inherit that console. The
+    // server logs to `server.log` regardless, so nothing is lost.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    let child = command
         .spawn()
         .with_context(|| format!("spawning background `{} serve`", exe.display()))?;
     let pid = child.id();

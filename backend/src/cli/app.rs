@@ -131,6 +131,12 @@ mod imp {
     /// here. Never returns — the event loop diverges and exits the process on
     /// Quit.
     pub fn run_blocking(args: AppArgs) -> anyhow::Result<()> {
+        // Route logging to `<home>/server.log` before anything starts. The tray
+        // launcher (especially `pulpw.exe`, a windowless GUI process) has no
+        // console, so without this the server's tracing output would be dropped
+        // and the tray's "Open logs folder" would show nothing.
+        crate::cli::init_serve_logging();
+
         // Resolve the URLs once, up front, off the GUI event loop. `install_url`
         // shells out to `tailscale` (blocking, with a cert side effect), which
         // must never run on the event-loop thread — doing it here, before the

@@ -22,11 +22,24 @@ include = [
     "openapi.json",
     ".env.example",
     "web-dist/**/*",
+    # The Windows .exe icon/metadata embedded by build.rs (winresource); also the
+    # WiX MSI source. Cosmetic if absent, but ship it so packaged builds get it.
+    "wix/**/*",
 ]
 
 [[bin]]
 name = "pulp"
 path = "src/main.rs"
+
+# `pulpw` — the windowless Windows desktop launcher (see src/bin/pulpw.rs). A PE
+# has one subsystem, so a clean CLI and a no-console GUI can't share a binary;
+# this is the `windows`-subsystem twin of `pulp.exe`, à la python.exe/pythonw.exe.
+# `required-features` keeps it out of the default/CI build (it needs the tray
+# stack); it is only built for the desktop app, alongside `pulp.exe`.
+[[bin]]
+name = "pulpw"
+path = "src/bin/pulpw.rs"
+required-features = ["tray"]
 
 [lib]
 name = "pulp"
@@ -93,6 +106,15 @@ open = { version = "5", optional = true }
 # Enable the system-tray/menubar desktop launcher (`pulp app`). Requires GTK3 +
 # libayatana-appindicator dev packages on Linux. Not part of the default build.
 tray = ["dep:tray-icon", "dep:tao", "dep:auto-launch", "dep:image", "dep:open"]
+
+# Embed the app icon + version metadata into the Windows .exe(s) at build time,
+# so pulp.exe/pulpw.exe show the Pulp icon in Explorer, the taskbar, and Alt-Tab
+# (the MSI shortcut icon alone doesn't cover the running process). Windows-only,
+# so non-Windows/CI builds don't pull it in. Uses the Windows SDK's rc.exe (MSVC)
+# or windres (GNU); a missing resource compiler degrades to no icon, not a failed
+# build (see build.rs).
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"
 
 [dev-dependencies]
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }

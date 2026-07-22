@@ -105,7 +105,10 @@ jobs:
       # --- Build the tray-enabled exe FIRST. cargo-wix cannot forward a
       #     --features flag to its own build, so we build here and have the wxs
       #     harvest this prebuilt exe (cargo wix --no-build --target-bin-dir). ---
-      - name: Build pulp.exe (--features tray)
+      # Builds BOTH binaries: pulp.exe (console CLI) and pulpw.exe (windowless
+      # desktop app). pulpw has `required-features = ["tray"]`, so enabling the
+      # tray feature is what pulls it into the build.
+      - name: Build pulp.exe + pulpw.exe (--features tray)
         run: cd backend && cargo build --release --features tray --target x86_64-pc-windows-msvc
 
       - name: Signing preflight
@@ -145,18 +148,21 @@ jobs:
           [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
           "PFX_PATH=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Sign pulp.exe (before packaging)
+      - name: Sign pulp.exe + pulpw.exe (before packaging)
         if: steps.preflight.outputs.sign == 'true'
         shell: pwsh
         env:
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $exe = "backend\target\x86_64-pc-windows-msvc\release\pulp.exe"
-          & "${{ steps.signtool.outputs.path }}" sign `
-            /f $env:PFX_PATH /p $env:WINDOWS_CERTIFICATE_PASSWORD `
-            /fd SHA256 /tr $env:TIMESTAMP_URL /td SHA256 $exe
-          & "${{ steps.signtool.outputs.path }}" verify /pa $exe
+          $dir = "backend\target\x86_64-pc-windows-msvc\release"
+          foreach ($name in 'pulp.exe', 'pulpw.exe') {
+            $exe = Join-Path $dir $name
+            & "${{ steps.signtool.outputs.path }}" sign `
+              /f $env:PFX_PATH /p $env:WINDOWS_CERTIFICATE_PASSWORD `
+              /fd SHA256 /tr $env:TIMESTAMP_URL /td SHA256 $exe
+            & "${{ steps.signtool.outputs.path }}" verify /pa $exe
+          }
 
       # --- Package the MSI from the prebuilt (and, if enabled, already-signed)
       #     exe. --no-build skips cargo build; --target-bin-dir sets
