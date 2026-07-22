@@ -250,24 +250,15 @@ fn start(home: &Path, addr: &str, json: bool, out: &mut dyn Write) -> anyhow::Re
 
     let exe = std::env::current_exe().context("locating the pulp executable")?;
     let log = open_log(home)?;
-    let mut command = Command::new(&exe);
-    command
+    // `proc::command` sets CREATE_NO_WINDOW on Windows: `pulp.exe` is a
+    // console-subsystem app, so without it a `serve start` from a GUI context
+    // (the tray, Explorer, a shortcut) pops a stray console. The background
+    // server logs to `server.log`, so nothing is lost.
+    let child = crate::proc::command(&exe)
         .arg("serve")
         .stdin(Stdio::null())
         .stdout(log.try_clone().context("duplicating log handle")?)
-        .stderr(log);
-    // On Windows, spawn the background server with no console window. `pulp.exe`
-    // is a console-subsystem app, so without CREATE_NO_WINDOW a `serve start`
-    // launched from a GUI context (the tray, Explorer, a shortcut) pops a stray
-    // console; from a terminal it would otherwise inherit that console. The
-    // server logs to `server.log` regardless, so nothing is lost.
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
-    let child = command
+        .stderr(log)
         .spawn()
         .with_context(|| format!("spawning background `{} serve`", exe.display()))?;
     let pid = child.id();
@@ -439,7 +430,7 @@ fn process_name_matches(pid: u32, expected: &str) -> bool {
     {
         // Reuse the same CSV row shape `pid_alive` parses: the first field is
         // the quoted image name, e.g. `"pulp.exe","12345",...`.
-        let output = Command::new("tasklist")
+        let output = crate::proc::command("tasklist")
             .args(["/FI", &format!("PID eq {}", pid), "/NH", "/FO", "CSV"])
             .stderr(Stdio::null())
             .output();
@@ -521,7 +512,7 @@ fn pid_alive(pid: u32) -> bool {
         // and an informational "No tasks..." line (to stdout, exit 0) when it
         // doesn't — so we can't rely on the exit status. Instead, confirm the
         // PID actually appears in a process row of the CSV output.
-        let output = Command::new("tasklist")
+        let output = crate::proc::command("tasklist")
             .args([
                 "/FI",
                 &format!("PID eq {}", pid),
@@ -595,7 +586,7 @@ fn kill_and_wait(pid: u32) -> anyhow::Result<()> {
 /// Terminate `pid` (and its tree) with `taskkill`. `force` adds `/F`.
 #[cfg(windows)]
 fn taskkill(pid: u32, force: bool) -> bool {
-    let mut cmd = Command::new("taskkill");
+    let mut cmd = crate::proc::command("taskkill");
     cmd.args(["/PID", &pid.to_string(), "/T"]);
     if force {
         cmd.arg("/F");

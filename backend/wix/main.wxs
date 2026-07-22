@@ -139,6 +139,11 @@
             <ComponentRef Id="StartMenuShortcut" />
         </Feature>
 
+        <!-- Show Pulp's actual MIT license on the installer's license page,
+             overriding the Lorem-ipsum placeholder WixUIExtension ships as the
+             default WixUILicenseRtf. -->
+        <WixVariable Id="WixUILicenseRtf" Value="wix\License.rtf" />
+
         <!-- Let the user pick the install directory (WixUI_InstallDir). -->
         <Property Id="WIXUI_INSTALLDIR" Value="APPLICATIONFOLDER" />
         <UIRef Id="WixUI_InstallDir" />

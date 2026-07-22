@@ -12,9 +12,11 @@
 //! server stays HTTP-only with a hint logged (see `server::spawn_https`).
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use crate::config::Config;
+// `proc::command` sets CREATE_NO_WINDOW on Windows so these `tailscale`
+// invocations don't flash a console window under the windowless `pulpw.exe`.
+use crate::proc::command;
 
 /// Re-run `tailscale cert` when the cert file is older than this. The command
 /// is cheap when the cert is still valid and renews it when close to expiry
@@ -105,7 +107,7 @@ pub fn resolve_tailscale(home: &Path) -> Option<ResolvedTls> {
             "provisioning HTTPS certificate for {} via tailscale cert",
             host
         );
-        let out = Command::new(&ts)
+        let out = command(&ts)
             .args([
                 "cert",
                 "--cert-file",
@@ -177,7 +179,7 @@ fn tailscale_bin() -> Option<PathBuf> {
         ]
     };
     for c in candidates {
-        if Command::new(c)
+        if command(c)
             .arg("version")
             .output()
             .is_ok_and(|o| o.status.success())
@@ -193,7 +195,7 @@ fn tailscale_bin() -> Option<PathBuf> {
 /// tailnet has HTTPS certificates enabled — the admin-console toggle the
 /// user must flip once.
 fn tailscale_self(ts: &Path) -> Option<(String, Option<std::net::IpAddr>)> {
-    let out = Command::new(ts).args(["status", "--json"]).output().ok()?;
+    let out = command(ts).args(["status", "--json"]).output().ok()?;
     if !out.status.success() {
         tracing::debug!("tailscale status failed; not connected?");
         return None;
