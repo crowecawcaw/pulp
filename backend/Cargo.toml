@@ -8,6 +8,10 @@ license = "MIT"
 repository = "https://github.com/crowecawcaw/pulp"
 homepage = "https://github.com/crowecawcaw/pulp"
 description = "Self-hostable social listening / brand monitoring for developer communities"
+# With a second binary (pulpw, the Windows desktop app), bare `cargo run` is
+# ambiguous. Pin the default so the documented `cargo run -- serve` /
+# `cargo run -- --dump-openapi` commands keep working (and CI's openapi regen).
+default-run = "pulp"
 # The published crate must carry the built web UI (web-dist/), which is
 # gitignored — so we set an explicit `include`. Once `include` is set it is the
 # ONLY allowlist Cargo packages, so it must enumerate everything the crate needs

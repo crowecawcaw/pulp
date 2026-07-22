@@ -29,6 +29,12 @@ on:
 permissions:
   contents: read
 
+# One in-flight build per branch: a new push supersedes the previous run so
+# stale MSI builds don't pile up on the (free, but slow) Windows runner.
+concurrency:
+  group: windows-installer-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   # WiX v3 (candle.exe / light.exe), the toolset cargo-wix drives by default.
   WIX3_URL: https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip
